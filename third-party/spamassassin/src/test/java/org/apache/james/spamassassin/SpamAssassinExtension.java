@@ -24,11 +24,14 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.stream.Stream;
 
+import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.AfterEachCallback;
-import org.junit.jupiter.api.extension.BeforeEachCallback;
+import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolutionException;
@@ -38,7 +41,8 @@ import org.testcontainers.images.builder.ImageFromDockerfile;
 
 import com.github.fge.lambdas.Throwing;
 
-public class SpamAssassinExtension implements BeforeEachCallback, AfterEachCallback, ParameterResolver {
+public class SpamAssassinExtension implements BeforeAllCallback, AfterEachCallback, AfterAllCallback, ParameterResolver {
+    private static final Duration STARTUP_TIMEOUT = Duration.ofMinutes(30);
 
     private final GenericContainer<?> spamAssassinContainer;
     private SpamAssassin spamAssassin;
@@ -51,19 +55,34 @@ public class SpamAssassinExtension implements BeforeEachCallback, AfterEachCallb
                 .withFileFromClasspath("run.sh", "docker/spamassassin/run.sh")
                 .withFileFromClasspath("spamd.sh", "docker/spamassassin/spamd.sh")
                 .withFileFromClasspath("rule-update.sh", "docker/spamassassin/rule-update.sh")
-                .withFileFromClasspath("bayes_pg.sql", "docker/spamassassin/bayes_pg.sql"));
-        spamAssassinContainer.waitingFor(new SpamAssassinWaitStrategy(spamAssassinContainer));
+                .withFileFromClasspath("bayes_pg.sql", "docker/spamassassin/bayes_pg.sql"))
+            .withCreateContainerCmdModifier(cmd -> cmd.withName(containerName()));
+        spamAssassinContainer.withStartupTimeout(STARTUP_TIMEOUT);
+        spamAssassinContainer.waitingFor(new SpamAssassinWaitStrategy(spamAssassinContainer, STARTUP_TIMEOUT));
     }
 
     @Override
-    public void beforeEach(ExtensionContext context) {
+    public void beforeAll(ExtensionContext context) {
         spamAssassinContainer.start();
         spamAssassin = new SpamAssassin(spamAssassinContainer);
     }
 
     @Override
     public void afterEach(ExtensionContext context) {
+        clearSpamAssassinDatabase();
+    }
+
+    @Override
+    public void afterAll(ExtensionContext context) {
         spamAssassinContainer.close();
+    }
+
+    private void clearSpamAssassinDatabase() {
+        try {
+            spamAssassin.clearSpamAssassinDatabase();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -78,6 +97,10 @@ public class SpamAssassinExtension implements BeforeEachCallback, AfterEachCallb
 
     public SpamAssassin getSpamAssassin() {
         return spamAssassin;
+    }
+
+    private String containerName() {
+        return "spam-assassin-" + UUID.randomUUID().toString();
     }
 
     public static class SpamAssassin {
@@ -142,6 +165,14 @@ public class SpamAssassinExtension implements BeforeEachCallback, AfterEachCallb
 
         public void dump(String user) throws UnsupportedOperationException, IOException, InterruptedException {
             spamAssassinContainer.execInContainer("sa-learn", "--dump", "magic", "-u", user);
+        }
+
+        public void clear(String user) throws UnsupportedOperationException, IOException, InterruptedException {
+            spamAssassinContainer.execInContainer("sa-learn", "--clear", "-u", user);
+        }
+
+        public void clearSpamAssassinDatabase() throws UnsupportedOperationException, IOException, InterruptedException {
+            spamAssassinContainer.execInContainer("sa-learn", "--clear");
         }
     }
 

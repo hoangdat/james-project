@@ -33,8 +33,6 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import javax.mail.internet.MimeMessage;
-
 import org.apache.james.backend.rabbitmq.RabbitMQConfiguration;
 import org.apache.james.backend.rabbitmq.RabbitMQExtension;
 import org.apache.james.backends.cassandra.CassandraCluster;
@@ -42,22 +40,22 @@ import org.apache.james.backends.cassandra.CassandraClusterExtension;
 import org.apache.james.backends.cassandra.components.CassandraModule;
 import org.apache.james.backends.cassandra.init.configuration.CassandraConfiguration;
 import org.apache.james.blob.api.HashBlobId;
-import org.apache.james.blob.api.Store;
 import org.apache.james.blob.cassandra.CassandraBlobModule;
 import org.apache.james.blob.cassandra.CassandraBlobsDAO;
-import org.apache.james.blob.mail.MimeMessagePartsId;
 import org.apache.james.blob.mail.MimeMessageStore;
 import org.apache.james.eventsourcing.eventstore.cassandra.CassandraEventStoreModule;
 import org.apache.james.metrics.api.NoopGaugeRegistry;
 import org.apache.james.metrics.api.NoopMetricFactory;
 import org.apache.james.queue.api.MailQueue;
 import org.apache.james.queue.api.ManageableMailQueue;
-import org.apache.james.queue.rabbitmq.view.api.MailQueueView;
+import org.apache.james.queue.api.RawMailQueueItemDecoratorFactory;
+import org.apache.james.queue.rabbitmq.view.cassandra.CassandraMailQueueView;
 import org.apache.james.queue.rabbitmq.view.cassandra.CassandraMailQueueViewModule;
 import org.apache.james.queue.rabbitmq.view.cassandra.CassandraMailQueueViewTestFactory;
 import org.apache.james.queue.rabbitmq.view.cassandra.configuration.CassandraMailQueueViewConfiguration;
 import org.apache.james.util.streams.Iterators;
 import org.apache.mailet.Mail;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -92,12 +90,12 @@ class RabbitMQMailQueueConfigurationChangeTest {
     private RabbitMQManagementApi mqManagementApi;
     private RabbitClient rabbitClient;
     private ThreadLocalRandom random;
-    private Store<MimeMessage, MimeMessagePartsId> mimeMessageStore;
+    private MimeMessageStore.Factory mimeMessageStoreFactory;
 
     @BeforeEach
     void setup(CassandraCluster cassandra) throws Exception {
         CassandraBlobsDAO blobsDAO = new CassandraBlobsDAO(cassandra.getConf(), CassandraConfiguration.DEFAULT_CONFIGURATION, BLOB_ID_FACTORY);
-        mimeMessageStore = MimeMessageStore.factory(blobsDAO).mimeMessageStore();
+        mimeMessageStoreFactory = MimeMessageStore.factory(blobsDAO);
         clock = new UpdatableTickingClock(IN_SLICE_1);
         random = ThreadLocalRandom.current();
 
@@ -110,19 +108,27 @@ class RabbitMQMailQueueConfigurationChangeTest {
         mqManagementApi = new RabbitMQManagementApi(rabbitMQConfiguration);
     }
 
+    @AfterEach
+    void tearDown() {
+        mqManagementApi.deleteAllQueues();
+    }
+
     private RabbitMQMailQueue getRabbitMQMailQueue(CassandraCluster cassandra, CassandraMailQueueViewConfiguration mailQueueViewConfiguration) throws Exception {
-        MailQueueView mailQueueView = CassandraMailQueueViewTestFactory.factory(clock, random, cassandra.getConf(), cassandra.getTypesProvider(),
-            mailQueueViewConfiguration, mimeMessageStore)
-            .create(MailQueueName.fromString(SPOOL));
+        CassandraMailQueueView.Factory mailQueueViewFactory = CassandraMailQueueViewTestFactory.factory(clock, random,
+            cassandra.getConf(),
+            cassandra.getTypesProvider(),
+            mailQueueViewConfiguration,
+            mimeMessageStoreFactory);
 
         RabbitMQMailQueueFactory.PrivateFactory privateFactory = new RabbitMQMailQueueFactory.PrivateFactory(
             new NoopMetricFactory(),
             new NoopGaugeRegistry(),
             rabbitClient,
-            mimeMessageStore,
+            mimeMessageStoreFactory,
             BLOB_ID_FACTORY,
-            mailQueueView,
-            clock);
+            mailQueueViewFactory,
+            clock,
+            new RawMailQueueItemDecoratorFactory());
         RabbitMQMailQueueFactory mailQueueFactory = new RabbitMQMailQueueFactory(rabbitClient, mqManagementApi, privateFactory);
         return mailQueueFactory.createQueue(SPOOL);
     }

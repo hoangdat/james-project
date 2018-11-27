@@ -26,6 +26,7 @@ import java.util.concurrent.Executors;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.NotImplementedException;
+import org.apache.james.backends.es.ElasticSearchConfiguration;
 import org.apache.james.backends.es.ElasticSearchIndexer;
 import org.apache.james.backends.es.EmbeddedElasticSearch;
 import org.apache.james.backends.es.utils.TestingClientProvider;
@@ -89,7 +90,8 @@ public class ElasticSearchHostSystem extends JamesImapHostSystem {
 
     private void initFields() throws MailboxException {
         Client client = MailboxIndexCreationUtil.prepareDefaultClient(
-            new TestingClientProvider(embeddedElasticSearch.getNode()).get());
+            new TestingClientProvider(embeddedElasticSearch.getNode()).get(),
+                ElasticSearchConfiguration.DEFAULT_CONFIGURATION);
 
         InMemoryMailboxSessionMapperFactory factory = new InMemoryMailboxSessionMapperFactory();
         InMemoryMessageId.Factory messageIdFactory = new InMemoryMessageId.Factory();
@@ -114,7 +116,7 @@ public class ElasticSearchHostSystem extends JamesImapHostSystem {
         this.mailboxManager.setMessageSearchIndex(searchIndex);
         this.mailboxManager.addGlobalListener(searchIndex, new MockMailboxSession("admin"));
 
-        final ImapProcessor defaultImapProcessorFactory =
+        ImapProcessor defaultImapProcessorFactory =
             DefaultImapProcessorFactory.createDefaultProcessor(this.mailboxManager,
                 new StoreSubscriptionManager(factory),
                 new NoQuotaManager(),
@@ -123,8 +125,6 @@ public class ElasticSearchHostSystem extends JamesImapHostSystem {
         configure(new DefaultImapDecoderFactory().buildImapDecoder(),
             new DefaultImapEncoderFactory().buildImapEncoder(),
             defaultImapProcessorFactory);
-
-        embeddedElasticSearch.awaitForElasticSearch();
     }
 
     @Override
@@ -138,7 +138,12 @@ public class ElasticSearchHostSystem extends JamesImapHostSystem {
     }
 
     @Override
-    public void setQuotaLimits(QuotaCount maxMessageQuota, QuotaSize maxStorageQuota) throws Exception {
+    public void setQuotaLimits(QuotaCount maxMessageQuota, QuotaSize maxStorageQuota) {
         throw new NotImplementedException();
+    }
+
+    @Override
+    protected void await() {
+        embeddedElasticSearch.awaitForElasticSearch();
     }
 }

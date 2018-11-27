@@ -23,7 +23,7 @@
     <parent>
         <groupId>org.apache.james</groupId>
         <artifactId>james-project</artifactId>
-        <version>3.2.0-SNAPSHOT</version>
+        <version>3.3.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>apache-james-mailbox</artifactId>
@@ -40,8 +40,6 @@
         <module>caching</module>
         <module>cassandra</module>
         <module>elasticsearch</module>
-        <module>hbase</module>
-        <module>jcr</module>
         <module>jpa</module>
         <module>lucene</module>
         <module>maildir</module>

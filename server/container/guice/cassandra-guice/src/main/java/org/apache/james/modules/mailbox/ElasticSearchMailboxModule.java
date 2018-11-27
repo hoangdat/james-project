@@ -32,7 +32,9 @@ import javax.inject.Singleton;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.james.backends.es.ClientProviderImpl;
+import org.apache.james.backends.es.ElasticSearchConfiguration;
 import org.apache.james.backends.es.ElasticSearchIndexer;
+import org.apache.james.mailbox.elasticsearch.ElasticSearchMailboxConfiguration;
 import org.apache.james.mailbox.elasticsearch.IndexAttachments;
 import org.apache.james.mailbox.elasticsearch.MailboxElasticSearchConstants;
 import org.apache.james.mailbox.elasticsearch.MailboxIndexCreationUtil;
@@ -43,6 +45,7 @@ import org.apache.james.mailbox.model.MailboxId;
 import org.apache.james.mailbox.model.MessageId;
 import org.apache.james.mailbox.store.search.ListeningMessageSearchIndex;
 import org.apache.james.mailbox.store.search.MessageSearchIndex;
+import org.apache.james.quota.search.elasticsearch.ElasticSearchQuotaConfiguration;
 import org.apache.james.quota.search.elasticsearch.QuotaSearchIndexCreationUtil;
 import org.apache.james.util.retry.RetryExecutorUtil;
 import org.apache.james.utils.PropertiesProvider;
@@ -74,8 +77,8 @@ public class ElasticSearchMailboxModule extends AbstractModule {
     @Singleton
     @Named(MailboxElasticSearchConstants.InjectionNames.MAILBOX)
     private ElasticSearchIndexer createMailboxElasticSearchIndexer(Client client,
-                                               @Named("AsyncExecutor") ExecutorService executor,
-                                               ElasticSearchConfiguration configuration) {
+                                                                   @Named("AsyncExecutor") ExecutorService executor,
+                                                                   ElasticSearchMailboxConfiguration configuration) {
         return new ElasticSearchIndexer(
             client,
             executor,
@@ -89,7 +92,7 @@ public class ElasticSearchMailboxModule extends AbstractModule {
                                                                      QueryConverter queryConverter,
                                                                      MailboxId.Factory mailboxIdFactory,
                                                                      MessageId.Factory messageIdFactory,
-                                                                     ElasticSearchConfiguration configuration) {
+                                                                     ElasticSearchMailboxConfiguration configuration) {
         return new ElasticSearchSearcher(
             client,
             queryConverter,
@@ -114,35 +117,53 @@ public class ElasticSearchMailboxModule extends AbstractModule {
 
     @Provides
     @Singleton
+    private ElasticSearchMailboxConfiguration getElasticSearchMailboxConfiguration(PropertiesProvider propertiesProvider) throws ConfigurationException {
+        try {
+            Configuration configuration = propertiesProvider.getConfiguration(ELASTICSEARCH_CONFIGURATION_NAME);
+            return ElasticSearchMailboxConfiguration.fromProperties(configuration);
+        } catch (FileNotFoundException e) {
+            LOGGER.warn("Could not find " + ELASTICSEARCH_CONFIGURATION_NAME + " configuration file. Providing a default ElasticSearchMailboxConfiguration");
+            return ElasticSearchMailboxConfiguration.DEFAULT_CONFIGURATION;
+        }
+    }
+
+    @Provides
+    @Singleton
     protected Client provideClient(ElasticSearchConfiguration configuration,
+                                   ElasticSearchMailboxConfiguration mailboxConfiguration,
+                                   ElasticSearchQuotaConfiguration quotaConfiguration,
                                    AsyncRetryExecutor executor) throws ExecutionException, InterruptedException {
 
         return RetryExecutorUtil.retryOnExceptions(executor, configuration.getMaxRetries(), configuration.getMinDelay(), NoNodeAvailableException.class)
-            .getWithRetry(context -> connectToCluster(configuration))
+            .getWithRetry(context -> connectToCluster(configuration, mailboxConfiguration, quotaConfiguration))
             .get();
     }
 
-    private Client connectToCluster(ElasticSearchConfiguration configuration) {
+    private Client connectToCluster(ElasticSearchConfiguration configuration,
+                                    ElasticSearchMailboxConfiguration mailboxConfiguration,
+                                    ElasticSearchQuotaConfiguration quotaConfiguration) {
         LOGGER.info("Trying to connect to ElasticSearch service at {}", LocalDateTime.now());
 
-        Client client = ClientProviderImpl.fromHosts(configuration.getHosts()).get();
+        Client client = ClientProviderImpl.fromHosts(configuration.getHosts(), configuration.getClusterName()).get();
 
         MailboxIndexCreationUtil.prepareClient(client,
-            configuration.getReadAliasMailboxName(),
-            configuration.getWriteAliasMailboxName(),
-            configuration.getIndexMailboxName());
+            mailboxConfiguration.getReadAliasMailboxName(),
+            mailboxConfiguration.getWriteAliasMailboxName(),
+            mailboxConfiguration.getIndexMailboxName(),
+            configuration);
 
         QuotaSearchIndexCreationUtil.prepareClient(client,
-            configuration.getReadAliasQuotaRatioName(),
-            configuration.getWriteAliasMailboxName(),
-            configuration.getIndexQuotaRatioName());
+            quotaConfiguration.getReadAliasQuotaRatioName(),
+            quotaConfiguration.getWriteAliasQuotaRatioName(),
+            quotaConfiguration.getIndexQuotaRatioName(),
+            configuration);
 
         return client;
     }
 
     @Provides
     @Singleton
-    public IndexAttachments provideIndexAttachments(ElasticSearchConfiguration configuration) {
+    public IndexAttachments provideIndexAttachments(ElasticSearchMailboxConfiguration configuration) {
         return configuration.getIndexAttachment();
     }
 

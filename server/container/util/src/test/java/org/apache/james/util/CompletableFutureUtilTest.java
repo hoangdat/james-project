@@ -20,6 +20,7 @@
 package org.apache.james.util;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -27,6 +28,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -48,20 +50,6 @@ public class CompletableFutureUtilTest {
     @After
     public void tearDown() {
         executorService.shutdownNow();
-    }
-
-    @Test
-    public void combineShouldReturnCombinationOfBothSuppliedFutures() {
-        int value1 = 18;
-        int value2 = 12;
-
-        assertThat(CompletableFutureUtil.combine(
-            CompletableFuture.completedFuture(value1),
-            CompletableFuture.completedFuture(value2),
-            (a, b) -> 2 * a + b)
-            .join())
-            .isEqualTo(2 * value1 + value2);
-
     }
 
     @Test
@@ -137,6 +125,19 @@ public class CompletableFutureUtilTest {
                 .join()
                 .collect(Guavate.toImmutableList()))
             .containsOnly(value1, value2, value3);
+    }
+
+    @Test
+    public void allOfShouldSupportNullValue() {
+        assertThatCode(() ->
+            CompletableFutureUtil.allOf(
+                Stream.of(
+                    CompletableFuture.completedFuture(null),
+                    CompletableFuture.completedFuture(null),
+                    CompletableFuture.completedFuture(null)))
+                .join()
+                .collect(Collectors.toList()))
+            .doesNotThrowAnyException();
     }
 
     @Test

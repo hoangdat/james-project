@@ -77,6 +77,7 @@ public class JPAHostSystem extends JamesImapHostSystem {
         Feature.USER_FLAGS_SUPPORT,
         Feature.ANNOTATION_SUPPORT,
         Feature.QUOTA_SUPPORT,
+        Feature.MOVE_SUPPORT,
         Feature.MOD_SEQ_SEARCH);
 
     public static JamesImapHostSystem build() throws Exception {
@@ -169,4 +170,8 @@ public class JPAHostSystem extends JamesImapHostSystem {
         maxQuotaManager.setGlobalMaxStorage(maxStorageQuota);
     }
 
+    @Override
+    protected void await() throws Exception {
+
+    }
 }

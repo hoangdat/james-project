@@ -19,6 +19,7 @@
 
 package org.apache.james.blob.objectstorage;
 
+import java.util.Optional;
 import java.util.function.Supplier;
 
 import org.apache.james.blob.api.BlobId;
@@ -28,32 +29,56 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 public class ObjectStorageBlobsDAOBuilder {
-    private final Supplier<BlobStore> supplier;
-    private ContainerName containerName;
-    private BlobId.Factory blobIdFactory;
 
-    public ObjectStorageBlobsDAOBuilder(Supplier<BlobStore> supplier) {
-        this.supplier = supplier;
+    public static RequireContainerName forBlobStore(Supplier<BlobStore> supplier) {
+        return containerName -> blobIdFactory -> new ReadyToBuild(supplier, blobIdFactory, containerName);
     }
 
-    public ObjectStorageBlobsDAOBuilder container(ContainerName containerName) {
-        this.containerName = containerName;
-        return this;
+    @FunctionalInterface
+    public interface RequireContainerName {
+        RequireBlobIdFactory container(ContainerName containerName);
     }
 
-    public ObjectStorageBlobsDAOBuilder blobIdFactory(BlobId.Factory blobIdFactory) {
-        this.blobIdFactory = blobIdFactory;
-        return this;
+    @FunctionalInterface
+    public interface RequireBlobIdFactory {
+        ReadyToBuild blobIdFactory(BlobId.Factory blobIdFactory);
     }
 
-    public ObjectStorageBlobsDAO build() {
-        Preconditions.checkState(containerName != null);
-        Preconditions.checkState(blobIdFactory != null);
-        return new ObjectStorageBlobsDAO(containerName, blobIdFactory, supplier.get());
+    public static class ReadyToBuild {
+
+        private final Supplier<BlobStore> supplier;
+        private final ContainerName containerName;
+        private final BlobId.Factory blobIdFactory;
+        private Optional<PayloadCodec> payloadCodec;
+
+        public ReadyToBuild(Supplier<BlobStore> supplier, BlobId.Factory blobIdFactory, ContainerName containerName) {
+            this.blobIdFactory = blobIdFactory;
+            this.containerName = containerName;
+            this.payloadCodec = Optional.empty();
+            this.supplier = supplier;
+        }
+
+        public ReadyToBuild payloadCodec(PayloadCodec payloadCodec) {
+            this.payloadCodec = Optional.of(payloadCodec);
+            return this;
+        }
+
+        public ReadyToBuild payloadCodec(Optional<PayloadCodec> payloadCodec) {
+            this.payloadCodec = payloadCodec;
+            return this;
+        }
+
+        public ObjectStorageBlobsDAO build() {
+            Preconditions.checkState(containerName != null);
+            Preconditions.checkState(blobIdFactory != null);
+
+            return new ObjectStorageBlobsDAO(containerName, blobIdFactory, supplier.get(), payloadCodec.orElse(PayloadCodec.DEFAULT_CODEC));
+        }
+
+        @VisibleForTesting
+        Supplier<BlobStore> getSupplier() {
+            return supplier;
+        }
     }
 
-    @VisibleForTesting
-    Supplier<BlobStore> getSupplier() {
-        return supplier;
-    }
 }

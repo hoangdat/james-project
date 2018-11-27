@@ -34,8 +34,10 @@ import org.apache.james.blob.objectstorage.swift.SwiftTempAuthObjectStorage;
 import org.jclouds.blobstore.domain.Blob;
 import org.jclouds.blobstore.options.CopyOptions;
 import org.jclouds.domain.Location;
+import org.jclouds.io.Payload;
 
 import com.github.fge.lambdas.Throwing;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.hash.Hashing;
 import com.google.common.hash.HashingInputStream;
@@ -49,23 +51,25 @@ public class ObjectStorageBlobsDAO implements BlobStore {
 
     private final ContainerName containerName;
     private final org.jclouds.blobstore.BlobStore blobStore;
+    private final PayloadCodec payloadCodec;
 
     ObjectStorageBlobsDAO(ContainerName containerName, BlobId.Factory blobIdFactory,
-                          org.jclouds.blobstore.BlobStore blobStore) {
+                          org.jclouds.blobstore.BlobStore blobStore, PayloadCodec payloadCodec) {
         this.blobIdFactory = blobIdFactory;
         this.containerName = containerName;
         this.blobStore = blobStore;
+        this.payloadCodec = payloadCodec;
     }
 
-    public static ObjectStorageBlobsDAOBuilder builder(SwiftTempAuthObjectStorage.Configuration testConfig) {
+    public static ObjectStorageBlobsDAOBuilder.RequireContainerName builder(SwiftTempAuthObjectStorage.Configuration testConfig) {
         return SwiftTempAuthObjectStorage.daoBuilder(testConfig);
     }
 
-    public static ObjectStorageBlobsDAOBuilder builder(SwiftKeystone2ObjectStorage.Configuration testConfig) {
+    public static ObjectStorageBlobsDAOBuilder.RequireContainerName builder(SwiftKeystone2ObjectStorage.Configuration testConfig) {
         return SwiftKeystone2ObjectStorage.daoBuilder(testConfig);
     }
 
-    public static ObjectStorageBlobsDAOBuilder builder(SwiftKeystone3ObjectStorage.Configuration testConfig) {
+    public static ObjectStorageBlobsDAOBuilder.RequireContainerName builder(SwiftKeystone3ObjectStorage.Configuration testConfig) {
         return SwiftKeystone3ObjectStorage.daoBuilder(testConfig);
     }
 
@@ -106,7 +110,8 @@ public class ObjectStorageBlobsDAO implements BlobStore {
     private BlobId save(InputStream data, BlobId id) {
         String containerName = this.containerName.value();
         HashingInputStream hashingInputStream = new HashingInputStream(Hashing.sha256(), data);
-        Blob blob = blobStore.blobBuilder(id.asString()).payload(hashingInputStream).build();
+        Payload payload = payloadCodec.write(hashingInputStream);
+        Blob blob = blobStore.blobBuilder(id.asString()).payload(payload).build();
         blobStore.putBlob(containerName, blob);
         return blobIdFactory.from(hashingInputStream.hash().toString());
     }
@@ -123,16 +128,21 @@ public class ObjectStorageBlobsDAO implements BlobStore {
 
         try {
             if (blob != null) {
-                return blob.getPayload().openStream();
+                return payloadCodec.read(blob.getPayload());
             } else {
                 return EMPTY_STREAM;
             }
         } catch (IOException cause) {
             throw new ObjectStoreException(
-                "Failed to read blob " + blobId.asString(),
+                "Failed to readBytes blob " + blobId.asString(),
                 cause);
         }
 
+    }
+
+    @VisibleForTesting
+    public void deleteContainer() {
+        blobStore.deleteContainer(containerName.value());
     }
 }
 

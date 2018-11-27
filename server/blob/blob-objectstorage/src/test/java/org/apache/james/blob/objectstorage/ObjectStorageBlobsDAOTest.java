@@ -22,13 +22,19 @@ package org.apache.james.blob.objectstorage;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.james.blob.api.BlobId;
 import org.apache.james.blob.api.BlobStore;
-import org.apache.james.blob.api.BlobStoreContract;
 import org.apache.james.blob.api.HashBlobId;
+import org.apache.james.blob.api.MetricableBlobStore;
+import org.apache.james.blob.api.MetricableBlobStoreContract;
 import org.apache.james.blob.api.ObjectStoreException;
+import org.apache.james.blob.objectstorage.crypto.CryptoConfig;
 import org.apache.james.blob.objectstorage.swift.Credentials;
 import org.apache.james.blob.objectstorage.swift.Identity;
 import org.apache.james.blob.objectstorage.swift.PassHeaderName;
@@ -42,19 +48,25 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(DockerSwiftExtension.class)
-public class ObjectStorageBlobsDAOTest implements BlobStoreContract {
+public class ObjectStorageBlobsDAOTest implements MetricableBlobStoreContract {
     private static final TenantName TENANT_NAME = TenantName.of("test");
     private static final UserName USER_NAME = UserName.of("tester");
     private static final Credentials PASSWORD = Credentials.of("testing");
     private static final Identity SWIFT_IDENTITY = Identity.of(TENANT_NAME, USER_NAME);
+    private static final String SAMPLE_SALT = "c603a7327ee3dcbc031d8d34b1096c605feca5e1";
+    private static final CryptoConfig CRYPTO_CONFIG = CryptoConfig.builder()
+        .salt(SAMPLE_SALT)
+        .password(PASSWORD.value().toCharArray())
+        .build();
 
     private ContainerName containerName;
     private org.jclouds.blobstore.BlobStore blobStore;
     private SwiftTempAuthObjectStorage.Configuration testConfig;
-    private ObjectStorageBlobsDAO testee;
+    private ObjectStorageBlobsDAO objectStorageBlobsDAO;
+    private BlobStore testee;
 
     @BeforeEach
-    void setUp(DockerSwift dockerSwift) throws Exception {
+    void setUp(DockerSwift dockerSwift) {
         containerName = ContainerName.of(UUID.randomUUID().toString());
         testConfig = SwiftTempAuthObjectStorage.configBuilder()
             .endpoint(dockerSwift.swiftEndpoint())
@@ -64,17 +76,18 @@ public class ObjectStorageBlobsDAOTest implements BlobStoreContract {
             .tempAuthHeaderPassName(PassHeaderName.of("X-Storage-Pass"))
             .build();
         BlobId.Factory blobIdFactory = blobIdFactory();
-        blobStore = ObjectStorageBlobsDAO
+        ObjectStorageBlobsDAOBuilder.ReadyToBuild daoBuilder = ObjectStorageBlobsDAO
             .builder(testConfig)
             .container(containerName)
-            .blobIdFactory(blobIdFactory)
-            .getSupplier().get();
-        testee = new ObjectStorageBlobsDAO(containerName, blobIdFactory, blobStore);
-        testee.createContainer(containerName);
+            .blobIdFactory(blobIdFactory);
+        blobStore = daoBuilder.getSupplier().get();
+        objectStorageBlobsDAO = daoBuilder.build();
+        objectStorageBlobsDAO.createContainer(containerName);
+        testee = new MetricableBlobStore(metricsTestExtension.getMetricFactory(), objectStorageBlobsDAO);
     }
 
     @AfterEach
-    void tearDown() throws Exception {
+    void tearDown() {
         blobStore.deleteContainer(containerName.value());
         blobStore.getContext().close();
     }
@@ -92,17 +105,59 @@ public class ObjectStorageBlobsDAOTest implements BlobStoreContract {
     @Test
     void createContainerShouldMakeTheContainerToExist() throws Exception {
         ContainerName containerName = ContainerName.of(UUID.randomUUID().toString());
-        testee.createContainer(containerName).get();
+        objectStorageBlobsDAO.createContainer(containerName).get();
         assertThat(blobStore.containerExists(containerName.value())).isTrue();
     }
 
     @Test
     void createContainerShouldFailWithRuntimeExceptionWhenCreateContainerTwice() throws Exception {
         ContainerName containerName = ContainerName.of(UUID.randomUUID().toString());
-        testee.createContainer(containerName).get();
-        assertThatThrownBy(() -> testee.createContainer(containerName).get())
+        objectStorageBlobsDAO.createContainer(containerName).get();
+        assertThatThrownBy(() -> objectStorageBlobsDAO.createContainer(containerName).get())
             .hasCauseInstanceOf(ObjectStoreException.class)
             .hasMessageContaining("Unable to create container");
+    }
+
+    @Test
+    void supportsEncryptionWithCustomPayloadCodec() {
+        ObjectStorageBlobsDAO encryptedDao = ObjectStorageBlobsDAO
+            .builder(testConfig)
+            .container(containerName)
+            .blobIdFactory(blobIdFactory())
+            .payloadCodec(new AESPayloadCodec(CRYPTO_CONFIG))
+            .build();
+        byte[] bytes = "James is the best!".getBytes(StandardCharsets.UTF_8);
+        BlobId blobId = encryptedDao.save(bytes).join();
+
+        InputStream read = encryptedDao.read(blobId);
+        assertThat(read).hasSameContentAs(new ByteArrayInputStream(bytes));
+    }
+
+    @Test
+    void encryptionWithCustomPayloadCodeCannotBeReadFromUnencryptedDAO() throws Exception {
+        ObjectStorageBlobsDAO encryptedDao = ObjectStorageBlobsDAO
+            .builder(testConfig)
+            .container(containerName)
+            .blobIdFactory(blobIdFactory())
+            .payloadCodec(new AESPayloadCodec(CRYPTO_CONFIG))
+            .build();
+        byte[] bytes = "James is the best!".getBytes(StandardCharsets.UTF_8);
+        BlobId blobId = encryptedDao.save(bytes).join();
+
+        InputStream encryptedIs = testee.read(blobId);
+        assertThat(encryptedIs).isNotNull();
+        byte[] encryptedBytes = IOUtils.toByteArray(encryptedIs);
+        assertThat(encryptedBytes).isNotEqualTo(bytes);
+
+        InputStream clearTextIs = encryptedDao.read(blobId);
+        assertThat(clearTextIs).hasSameContentAs(new ByteArrayInputStream(bytes));
+    }
+
+    @Test
+    void deleteContainerShouldDeleteSwiftContainer() {
+        objectStorageBlobsDAO.deleteContainer();
+        assertThat(blobStore.containerExists(containerName.value()))
+            .isFalse();
     }
 }
 

@@ -20,16 +20,20 @@
 package org.apache.james.modules.objectstorage;
 
 import org.apache.james.blob.api.BlobStore;
+import org.apache.james.blob.api.MetricableBlobStore;
 import org.apache.james.blob.objectstorage.ObjectStorageBlobsDAO;
 
 import com.google.inject.AbstractModule;
-import com.google.inject.Scopes;
+import com.google.inject.name.Names;
 
 public class ObjectStorageBlobStoreModule extends AbstractModule {
 
     @Override
     protected void configure() {
-        bind(ObjectStorageBlobsDAO.class).toProvider(ObjectStorageBlobsDAOProvider.class).in(Scopes.SINGLETON);
-        bind(BlobStore.class).to(ObjectStorageBlobsDAO.class);
+        install(new ObjectStorageDependenciesModule());
+        bind(BlobStore.class)
+            .annotatedWith(Names.named(MetricableBlobStore.BLOB_STORE_IMPLEMENTATION))
+            .to(ObjectStorageBlobsDAO.class);
     }
+
 }
