@@ -57,12 +57,6 @@ private object DTO {
       new JavaQuotaUsageUpdatedEvent(user, getQuotaRoot, countQuota.toJava, sizeQuota.toJava, time)
   }
 
-  case class QuotaNoop(user: User, quotaRoot: QuotaRoot) extends QuotaEvent {
-    override def getQuotaRoot: QuotaRoot = quotaRoot
-
-    override def toJava: JavaQuotaEvent = ???
-  }
-
 }
 
 private object JsonSerialize {

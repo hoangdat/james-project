@@ -34,32 +34,6 @@ import org.junit.jupiter.api.Test;
 
 class QuotaEventTest {
 
-    /*
-    @Test
-    void quotaNoopShouldBeEqualsToAnotherInstance() {
-        QuotaNoop foo = new QuotaNoop(User.fromUsername("foo@bar.com"), QuotaRoot.quotaRoot("foo", Optional.empty()));
-        QuotaNoop foo2 = new QuotaNoop(User.fromUsername("foo@bar.com"), QuotaRoot.quotaRoot("foo", Optional.empty()));
-        assertThat(foo).isEqualTo(foo2);
-    }
-    @Test
-    void quotaNoopShouldNotBeEqualToDifferentValue() {
-        QuotaNoop foo = new QuotaNoop(User.fromUsername("foo@bar.com"), QuotaRoot.quotaRoot("foo", Optional.empty()));
-        QuotaNoop foo2 = new QuotaNoop(User.fromUsername("joe@bar.com"), QuotaRoot.quotaRoot("foo", Optional.empty()));
-        assertThat(foo).isNotEqualTo(foo2);
-    }
-    @Test
-    void quotaNoopShouldNotBeEqualToDifferentCopy() {
-        QuotaNoop foo = new QuotaNoop(User.fromUsername("foo@bar.com"), QuotaRoot.quotaRoot("foo", Optional.empty()));
-        QuotaNoop foo2 = foo.copy(foo.copy$default$1(), QuotaRoot.quotaRoot("bar", Optional.empty()));;
-        assertThat(foo).isNotEqualTo(foo2);
-    }*/
-
-    /*@Test
-    void quotaNoopShouldBeSerializableToJson() {
-        QuotaNoop foo = new QuotaNoop(User.fromUsername("foo@bar.com"), QuotaRoot.quotaRoot("foo", Optional.empty()));
-        assertThat(QuotaEvent$.MODULE$.toJson(foo)).isEqualTo("{\"user\":\"foo@bar.com\",\"quotaRoot\":\"foo\"}");
-    }*/
-
     private static final User USER = User.fromUsername("user");
     private static final MailboxListener.QuotaUsageUpdatedEvent QUOTA_USAGE_UPDATED_EVENT =
         new MailboxListener.QuotaUsageUpdatedEvent(
