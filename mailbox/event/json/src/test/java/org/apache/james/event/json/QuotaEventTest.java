@@ -19,6 +19,7 @@
 
 package org.apache.james.event.json;
 
+import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
@@ -43,15 +44,20 @@ class QuotaEventTest {
             Quota.<QuotaSize>builder().used(QuotaSize.size(1234)).computedLimit(QuotaSize.size(10000)).build(),
             Instant.parse("2018-11-13T12:00:55Z"));
 
-    private static final String QUOTA_USAGE_UPDATED_EVENT_JSON = "{\"QuotaUsageUpdatedEvent\":{\"quotaRoot\":\"foo\"," +
-        "\"countQuota\":{\"used\":12,\"limit\":100,\"limits\":{}}," +
-        "\"time\":\"2018-11-13T12:00:55Z\"," +
-        "\"sizeQuota\":{\"used\":1234,\"limit\":10000,\"limits\":{}}," +
-        "\"user\":\"user\"}}";
+    private static final String QUOTA_USAGE_UPDATED_EVENT_JSON =
+        "{" +
+            "\"QuotaUsageUpdatedEvent\":{" +
+                "\"quotaRoot\":\"foo\"," +
+                "\"countQuota\":{\"used\":12,\"limit\":100,\"limits\":{}}," +
+                "\"time\":\"2018-11-13T12:00:55Z\"," +
+                "\"sizeQuota\":{\"used\":1234,\"limit\":10000,\"limits\":{}}," +
+                "\"user\":\"user\"" +
+            "}" +
+        "}";
 
     @Test
     void quotaUsageUpdatedShouldBeSerializableToJson() {
-        assertThat(QuotaEvent$.MODULE$.toJson(QUOTA_USAGE_UPDATED_EVENT))
+        assertThatJson(QuotaEvent$.MODULE$.toJson(QUOTA_USAGE_UPDATED_EVENT))
             .isEqualTo(QUOTA_USAGE_UPDATED_EVENT_JSON);
     }
 
