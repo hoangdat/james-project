@@ -24,7 +24,7 @@ public interface QuotaValue<T extends QuotaValue<T>> {
 
     long asLong();
 
-    Optional<Long> getValue();
+    Optional<Long> asOptional();
 
     boolean isLimited();
 

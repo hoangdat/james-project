@@ -49,7 +49,7 @@ public class QuotaCount implements QuotaValue<QuotaCount> {
     }
 
     @Override
-    public Optional<Long> getValue() {
+    public Optional<Long> asOptional() {
         return value;
     }
 

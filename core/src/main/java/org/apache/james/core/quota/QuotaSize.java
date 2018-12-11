@@ -51,7 +51,7 @@ public class QuotaSize implements QuotaValue<QuotaSize> {
     }
 
     @Override
-    public Optional<Long> getValue() {
+    public Optional<Long> asOptional() {
         return value;
     }
 

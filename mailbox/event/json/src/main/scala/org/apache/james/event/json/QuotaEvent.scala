@@ -17,7 +17,6 @@
   * under the License.                                           *
   * ***************************************************************/
 
-
 package org.apache.james.event.json
 
 import java.time.Instant
@@ -28,9 +27,10 @@ import org.apache.james.core.quota.{QuotaCount, QuotaSize, QuotaValue}
 import org.apache.james.core.{Domain, User}
 import org.apache.james.mailbox.MailboxListener.{QuotaEvent => JavaQuotaEvent, QuotaUsageUpdatedEvent => JavaQuotaUsageUpdatedEvent}
 import org.apache.james.mailbox.model.{QuotaRoot, Quota => JavaQuota}
-import play.api.libs.json.{JsError, JsNumber, JsObject, JsResult, JsString, JsSuccess, Json, OFormat, Reads, Writes}
+import play.api.libs.json.{JsError, JsNull, JsNumber, JsObject, JsResult, JsString, JsSuccess, Json, OFormat, Reads, Writes}
 
 import scala.collection.JavaConverters._
+import scala.compat.java8.OptionConverters
 
 private sealed trait QuotaEvent {
   def getQuotaRoot: QuotaRoot
@@ -62,7 +62,9 @@ private object DTO {
 private object JsonSerialize {
   implicit val userWriters: Writes[User] = (user: User) => JsString(user.asString)
   implicit val quotaRootWrites: Writes[QuotaRoot] = quotaRoot => JsString(quotaRoot.getValue)
-  implicit val quotaValueWrites: Writes[QuotaValue[_]] = value => JsNumber(value.asLong)
+  implicit val quotaValueWrites: Writes[QuotaValue[_]] = value => OptionConverters.toScala(value.asOptional())
+    .map(l => JsNumber(BigDecimal.decimal(l)))
+    .getOrElse(JsNull)
   implicit val quotaScopeWrites: Writes[JavaQuota.Scope] = value => JsString(value.name)
   implicit val quotaCountWrites: Writes[DTO.Quota[QuotaCount]] = Json.writes[DTO.Quota[QuotaCount]]
   implicit val quotaSizeWrites: Writes[DTO.Quota[QuotaSize]] = Json.writes[DTO.Quota[QuotaSize]]
@@ -77,10 +79,12 @@ private object JsonSerialize {
   }
   implicit val quotaCountReads: Reads[QuotaCount] = {
     case JsNumber(count) => JsSuccess(QuotaCount.count(count.toLong))
+    case JsNull => JsSuccess(QuotaCount.unlimited())
     case _ => JsError()
   }
   implicit val quotaSizeReads: Reads[QuotaSize] = {
     case JsNumber(size) => JsSuccess(QuotaSize.size(size.toLong))
+    case JsNull => JsSuccess(QuotaSize.unlimited())
     case _ => JsError()
   }
   implicit val quotaScopeReads: Reads[JavaQuota.Scope] = {
