@@ -51,6 +51,11 @@ public class QuotaSize implements QuotaValue<QuotaSize> {
     }
 
     @Override
+    public Optional<Long> getValue() {
+        return value;
+    }
+
+    @Override
     public boolean isLimited() {
         return value.isPresent();
     }

@@ -18,9 +18,13 @@
  ****************************************************************/
 package org.apache.james.core.quota;
 
+import java.util.Optional;
+
 public interface QuotaValue<T extends QuotaValue<T>> {
 
     long asLong();
+
+    Optional<Long> getValue();
 
     boolean isLimited();
 
