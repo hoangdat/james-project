@@ -17,6 +17,7 @@
   * under the License.                                           *
   * ***************************************************************/
 
+
 package org.apache.james.event.json
 
 import java.time.Instant
@@ -41,15 +42,19 @@ private object DTO {
 
   case class Quota[T <: QuotaValue[T]](used: T, limit: T, limits: Map[JavaQuota.Scope, T]) {
     def toJava: JavaQuota[T] =
-      JavaQuota.builder[T].used(used).computedLimit(limit).limitsByScope(limits.asJava).build()
+      JavaQuota.builder[T]
+        .used(used)
+        .computedLimit(limit)
+        .limitsByScope(limits.asJava)
+        .build()
   }
 
-  case class QuotaUsageUpdatedEvent(quotaRoot: QuotaRoot, countQuota: Quota[QuotaCount],
+  case class QuotaUsageUpdatedEvent(user: User, quotaRoot: QuotaRoot, countQuota: Quota[QuotaCount],
                                     sizeQuota: Quota[QuotaSize], time: Instant) extends QuotaEvent {
     override def getQuotaRoot: QuotaRoot = quotaRoot
 
     override def toJava: JavaQuotaEvent =
-      new JavaQuotaUsageUpdatedEvent(null, getQuotaRoot, countQuota.toJava, sizeQuota.toJava, time)
+      new JavaQuotaUsageUpdatedEvent(user, getQuotaRoot, countQuota.toJava, sizeQuota.toJava, time)
   }
 
   case class QuotaNoop(user: User, quotaRoot: QuotaRoot) extends QuotaEvent {
@@ -115,7 +120,12 @@ object QuotaEvent {
     DTO.Quota(used = java.getUsed, limit = java.getLimit, limits = java.getLimitByScope.asScala.toMap)
 
   private def toScala(event: JavaQuotaUsageUpdatedEvent): DTO.QuotaUsageUpdatedEvent =
-    DTO.QuotaUsageUpdatedEvent(quotaRoot = event.getQuotaRoot, countQuota = toScala(event.getCountQuota), sizeQuota = toScala(event.getSizeQuota), event.getInstant)
+    DTO.QuotaUsageUpdatedEvent(
+      user = event.getUser,
+      quotaRoot = event.getQuotaRoot,
+      countQuota = toScala(event.getCountQuota),
+      sizeQuota = toScala(event.getSizeQuota),
+      time = event.getInstant)
 
   def toJson(event: JavaQuotaEvent): String = event match {
     case e: JavaQuotaUsageUpdatedEvent => JsonSerialize.toJson(toScala(e))
