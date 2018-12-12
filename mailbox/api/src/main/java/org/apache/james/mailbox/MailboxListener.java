@@ -20,6 +20,7 @@
 package org.apache.james.mailbox;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -38,6 +39,8 @@ import org.apache.james.mailbox.model.UpdatedFlags;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
+import com.google.errorprone.annotations.Immutable;
 
 
 /**
@@ -304,7 +307,7 @@ public interface MailboxListener {
 
         public Expunged(MailboxSession.SessionId sessionId, User user, MailboxPath path, MailboxId mailboxId, Map<MessageUid, MessageMetaData> uids) {
             super(sessionId, user, path, mailboxId);
-            this.uids = uids;
+            this.uids = ImmutableMap.copyOf(uids);
         }
 
         @Override
