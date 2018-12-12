@@ -19,7 +19,6 @@
 
 package org.apache.james.mailbox;
 
-import java.io.Serializable;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -76,8 +75,7 @@ public interface MailboxListener {
         QuotaRoot getQuotaRoot();
     }
 
-    class QuotaUsageUpdatedEvent implements QuotaEvent, Serializable {
-
+    class QuotaUsageUpdatedEvent implements QuotaEvent {
         private final User user;
         private final QuotaRoot quotaRoot;
         private final Quota<QuotaCount> countQuota;
@@ -91,7 +89,6 @@ public interface MailboxListener {
             this.sizeQuota = sizeQuota;
             this.instant = instant;
         }
-
 
         @Override
         public User getUser() {
@@ -139,8 +136,7 @@ public interface MailboxListener {
     /**
      * A mailbox event.
      */
-    abstract class MailboxEvent implements Event, Serializable {
-
+    abstract class MailboxEvent implements Event {
         private final MailboxPath path;
         private final MailboxId mailboxId;
         private final User user;
@@ -196,13 +192,7 @@ public interface MailboxListener {
     /**
      * Indicates that mailbox has been deleted.
      */
-    final class MailboxDeletion extends MailboxEvent {
-
-        /**
-         *
-         */
-        private static final long serialVersionUID = 1L;
-
+    class MailboxDeletion extends MailboxEvent {
         private final QuotaRoot quotaRoot;
         private final QuotaCount deletedMessageCOunt;
         private final QuotaSize totalDeletedSize;
@@ -231,11 +221,7 @@ public interface MailboxListener {
     /**
      * Indicates that a mailbox has been Added.
      */
-    final class MailboxAdded extends MailboxEvent {
-        /**
-         *
-         */
-        private static final long serialVersionUID = 1L;
+    class MailboxAdded extends MailboxEvent {
 
         public MailboxAdded(MailboxSession.SessionId sessionId, User user, MailboxPath path, MailboxId mailboxId) {
             super(sessionId, user, path, mailboxId);
@@ -245,12 +231,7 @@ public interface MailboxListener {
     /**
      * Indicates that a mailbox has been renamed.
      */
-    final class MailboxRenamed extends MailboxEvent {
-        /**
-         *
-         */
-        private static final long serialVersionUID = 1L;
-
+    class MailboxRenamed extends MailboxEvent {
         private final MailboxPath newPath;
 
         public MailboxRenamed(MailboxSession.SessionId sessionId, User user, MailboxPath path, MailboxId mailboxId, MailboxPath newPath) {
@@ -272,9 +253,8 @@ public interface MailboxListener {
     /**
      * A mailbox event related to updated ACL
      */
-    final class MailboxACLUpdated extends MailboxEvent {
+    class MailboxACLUpdated extends MailboxEvent {
         private final ACLDiff aclDiff;
-        private static final long serialVersionUID = 1L;
 
         public MailboxACLUpdated(MailboxSession.SessionId sessionId, User user, MailboxPath path, ACLDiff aclDiff, MailboxId mailboxId) {
             super(sessionId, user, path, mailboxId);
@@ -291,11 +271,6 @@ public interface MailboxListener {
      * A mailbox event related to a message.
      */
     abstract class MessageEvent extends MailboxEvent {
-
-        /**
-         *
-         */
-        private static final long serialVersionUID = 1L;
 
         public MessageEvent(MailboxSession.SessionId sessionId, User user, MailboxPath path, MailboxId mailboxId) {
             super(sessionId, user, path, mailboxId);
@@ -316,7 +291,7 @@ public interface MailboxListener {
         }
 
         /**
-         * Return the flags which were set for the afected message
+         * Return the flags which were set for the affected message
          *
          * @return flags
          */
@@ -324,13 +299,7 @@ public interface MailboxListener {
 
     }
 
-    final class Expunged extends MetaDataHoldingEvent {
-
-        /**
-         *
-         */
-        private static final long serialVersionUID = 1L;
-
+    class Expunged extends MetaDataHoldingEvent {
         private final Map<MessageUid, MessageMetaData> uids;
 
         public Expunged(MailboxSession.SessionId sessionId, User user, MailboxPath path, MailboxId mailboxId, Map<MessageUid, MessageMetaData> uids) {
@@ -358,20 +327,14 @@ public interface MailboxListener {
     /**
      * A mailbox event related to updated flags
      */
-     final class FlagsUpdated extends MessageEvent {
-
-        /**
-         *
-         */
-        private static final long serialVersionUID = 1L;
-
+     class FlagsUpdated extends MessageEvent {
         private final List<MessageUid> uids;
-        private final List<UpdatedFlags> uFlags;
+        private final List<UpdatedFlags> updatedFlags;
 
-        public FlagsUpdated(MailboxSession.SessionId sessionId, User user, MailboxPath path, MailboxId mailboxId, List<MessageUid> uids, List<UpdatedFlags> uFlags) {
+        public FlagsUpdated(MailboxSession.SessionId sessionId, User user, MailboxPath path, MailboxId mailboxId, List<MessageUid> uids, List<UpdatedFlags> updatedFlags) {
             super(sessionId, user, path, mailboxId);
             this.uids = ImmutableList.copyOf(uids);
-            this.uFlags = ImmutableList.copyOf(uFlags);
+            this.updatedFlags = ImmutableList.copyOf(updatedFlags);
         }
 
         @Override
@@ -380,20 +343,14 @@ public interface MailboxListener {
         }
 
         public List<UpdatedFlags> getUpdatedFlags() {
-            return uFlags;
+            return updatedFlags;
         }
     }
 
     /**
      * A mailbox event related to added message
      */
-    final class Added extends MetaDataHoldingEvent {
-
-        /**
-         *
-         */
-        private static final long serialVersionUID = 1L;
-
+     class Added extends MetaDataHoldingEvent {
         private final Map<MessageUid, MessageMetaData> added;
 
         public Added(MailboxSession.SessionId sessionId, User user, MailboxPath path, MailboxId mailboxId, SortedMap<MessageUid, MessageMetaData> uids) {
