@@ -196,7 +196,7 @@ public interface MailboxListener {
     /**
      * Indicates that mailbox has been deleted.
      */
-    class MailboxDeletion extends MailboxEvent {
+    final class MailboxDeletion extends MailboxEvent {
 
         /**
          *
@@ -231,7 +231,7 @@ public interface MailboxListener {
     /**
      * Indicates that a mailbox has been Added.
      */
-    class MailboxAdded extends MailboxEvent {
+    final class MailboxAdded extends MailboxEvent {
         /**
          *
          */
@@ -245,7 +245,7 @@ public interface MailboxListener {
     /**
      * Indicates that a mailbox has been renamed.
      */
-    class MailboxRenamed extends MailboxEvent {
+    final class MailboxRenamed extends MailboxEvent {
         /**
          *
          */
@@ -272,7 +272,7 @@ public interface MailboxListener {
     /**
      * A mailbox event related to updated ACL
      */
-    class MailboxACLUpdated extends MailboxEvent {
+    final class MailboxACLUpdated extends MailboxEvent {
         private final ACLDiff aclDiff;
         private static final long serialVersionUID = 1L;
 
@@ -324,7 +324,7 @@ public interface MailboxListener {
 
     }
 
-    class Expunged extends MetaDataHoldingEvent {
+    final class Expunged extends MetaDataHoldingEvent {
 
         /**
          *
@@ -358,7 +358,7 @@ public interface MailboxListener {
     /**
      * A mailbox event related to updated flags
      */
-     class FlagsUpdated extends MessageEvent {
+     final class FlagsUpdated extends MessageEvent {
 
         /**
          *
@@ -387,7 +387,7 @@ public interface MailboxListener {
     /**
      * A mailbox event related to added message
      */
-    class Added extends MetaDataHoldingEvent {
+    final class Added extends MetaDataHoldingEvent {
 
         /**
          *

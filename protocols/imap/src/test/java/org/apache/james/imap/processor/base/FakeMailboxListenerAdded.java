@@ -38,7 +38,7 @@ public class FakeMailboxListenerAdded extends MailboxListener.Added {
     public List<MessageUid> uids;
 
     public FakeMailboxListenerAdded(MailboxSession.SessionId sessionId, User user, List<MessageUid> uids, MailboxPath path, MailboxId mailboxId) {
-        super(sessionId, user, path, mailboxId);
+        super(sessionId, user, path, mailboxId, null);
         this.uids = uids;
     }
 

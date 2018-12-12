@@ -31,27 +31,11 @@ import org.apache.james.mailbox.model.UpdatedFlags;
 
 public class FakeMailboxListenerFlagsUpdate extends FlagsUpdated {
 
-    public List<MessageUid> uids;
-
-    public List<UpdatedFlags> flags;
-
     public FakeMailboxListenerFlagsUpdate(MailboxSession session, List<MessageUid> uids, List<UpdatedFlags> flags, MailboxPath path, MailboxId mailboxId) {
         this(session.getSessionId(), session.getUser().getCoreUser(), uids, flags, path, mailboxId);
     }
 
     FakeMailboxListenerFlagsUpdate(MailboxSession.SessionId sessionId, User user, List<MessageUid> uids, List<UpdatedFlags> flags, MailboxPath path, MailboxId mailboxId) {
-        super(sessionId, user, path, mailboxId);
-        this.uids = uids;
-        this.flags = flags;
-    }
-
-    @Override
-    public List<UpdatedFlags> getUpdatedFlags() {
-        return flags;
-    }
-
-    @Override
-    public List<MessageUid> getUids() {
-        return uids;
+        super(sessionId, user, path, mailboxId, uids, flags);
     }
 }
