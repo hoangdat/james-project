@@ -151,16 +151,18 @@ public class MailboxEventAnalyserTest {
 
     @Test
     public void testShouldNotSetUidWhenNoSystemFlagChange() {
-        FakeMailboxListenerFlagsUpdate update = new FakeMailboxListenerFlagsUpdate(MAILBOX_SESSION,
+        MailboxListener.FlagsUpdated update = new MailboxListener.FlagsUpdated(
+            MAILBOX_SESSION.getSessionId(),
+            MAILBOX_SESSION.getUser().getCoreUser(),
+            MAILBOX_PATH,
+            MAILBOX_ID,
             ImmutableList.of(MessageUid.of(90L)),
             ImmutableList.of(UpdatedFlags.builder()
                 .uid(MessageUid.of(90))
                 .modSeq(-1)
                 .oldFlags(new Flags())
                 .newFlags(new Flags())
-                .build()),
-            MAILBOX_PATH,
-            MAILBOX_ID);
+                .build()));
         testee.event(update);
 
         assertThat(testee.flagUpdateUids()).isEmpty();
@@ -170,16 +172,18 @@ public class MailboxEventAnalyserTest {
     public void testShouldSetUidWhenSystemFlagChange() {
         MessageUid uid = MessageUid.of(900);
         
-        FakeMailboxListenerFlagsUpdate update = new FakeMailboxListenerFlagsUpdate(OTHER_MAILBOX_SESSION,
+        MailboxListener.FlagsUpdated update = new MailboxListener.FlagsUpdated(
+            OTHER_MAILBOX_SESSION.getSessionId(),
+            OTHER_MAILBOX_SESSION.getUser().getCoreUser(),
+            MAILBOX_PATH,
+            MAILBOX_ID,
             ImmutableList.of(uid),
             ImmutableList.of(UpdatedFlags.builder()
                 .uid(uid)
                 .modSeq(-1)
                 .oldFlags(new Flags())
                 .newFlags(new Flags(Flags.Flag.ANSWERED))
-                .build()),
-            MAILBOX_PATH,
-            MAILBOX_ID);
+                .build()));
         testee.event(update);
 
        assertThat(testee.flagUpdateUids().iterator()).containsExactly(uid);
@@ -190,16 +194,18 @@ public class MailboxEventAnalyserTest {
         MessageUid uid = MessageUid.of(900);
         SelectedMailboxImpl analyser = this.testee;
         
-        FakeMailboxListenerFlagsUpdate update = new FakeMailboxListenerFlagsUpdate(MAILBOX_SESSION,
+        MailboxListener.FlagsUpdated update = new MailboxListener.FlagsUpdated(
+            MAILBOX_SESSION.getSessionId(),
+            MAILBOX_SESSION.getUser().getCoreUser(),
+            MAILBOX_PATH,
+            MAILBOX_ID,
             ImmutableList.of(uid),
             ImmutableList.of(UpdatedFlags.builder()
                 .uid(uid)
                 .modSeq(-1)
                 .oldFlags(new Flags())
                 .newFlags(new Flags(Flags.Flag.ANSWERED))
-                .build()),
-            MAILBOX_PATH,
-            MAILBOX_ID);
+                .build()));
         analyser.event(update);
         analyser.event(update);
         analyser.deselect();
@@ -211,16 +217,18 @@ public class MailboxEventAnalyserTest {
     public void testShouldSetUidWhenSystemFlagChangeDifferentSessionInSilentMode() {
         MessageUid uid = MessageUid.of(900);
 
-        FakeMailboxListenerFlagsUpdate update = new FakeMailboxListenerFlagsUpdate(OTHER_MAILBOX_SESSION,
+        MailboxListener.FlagsUpdated update = new MailboxListener.FlagsUpdated(
+            OTHER_MAILBOX_SESSION.getSessionId(),
+            OTHER_MAILBOX_SESSION.getUser().getCoreUser(),
+            MAILBOX_PATH,
+            MAILBOX_ID,
             ImmutableList.of(uid),
             ImmutableList.of(UpdatedFlags.builder()
                 .uid(uid)
                 .modSeq(-1)
                 .oldFlags(new Flags())
                 .newFlags(new Flags(Flags.Flag.ANSWERED))
-                .build()),
-            MAILBOX_PATH,
-            MAILBOX_ID);
+                .build()));
         testee.event(update);
         testee.setSilentFlagChanges(true);
         testee.event(update);
@@ -230,16 +238,18 @@ public class MailboxEventAnalyserTest {
 
     @Test
     public void testShouldNotSetUidWhenSystemFlagChangeSameSessionInSilentMode() {
-        FakeMailboxListenerFlagsUpdate update = new FakeMailboxListenerFlagsUpdate(MAILBOX_SESSION,
+        MailboxListener.FlagsUpdated update = new MailboxListener.FlagsUpdated(
+            MAILBOX_SESSION.getSessionId(),
+            MAILBOX_SESSION.getUser().getCoreUser(),
+            MAILBOX_PATH,
+            MAILBOX_ID,
             ImmutableList.of(MessageUid.of(345)),
             ImmutableList.of(UpdatedFlags.builder()
                 .uid(MessageUid.of(345))
                 .modSeq(-1)
                 .oldFlags(new Flags())
                 .newFlags(new Flags())
-                .build()),
-            MAILBOX_PATH,
-            MAILBOX_ID);
+                .build()));
         testee.event(update);
         testee.setSilentFlagChanges(true);
         testee.event(update);
@@ -249,16 +259,18 @@ public class MailboxEventAnalyserTest {
 
     @Test
     public void testShouldNotSetUidWhenOnlyRecentFlagUpdated() {
-        FakeMailboxListenerFlagsUpdate update = new FakeMailboxListenerFlagsUpdate(MAILBOX_SESSION,
+        MailboxListener.FlagsUpdated update = new MailboxListener.FlagsUpdated(
+            MAILBOX_SESSION.getSessionId(),
+            MAILBOX_SESSION.getUser().getCoreUser(),
+            MAILBOX_PATH,
+            MAILBOX_ID,
             ImmutableList.of(MessageUid.of(886)),
             ImmutableList.of(UpdatedFlags.builder()
                 .uid(MessageUid.of(886))
                 .modSeq(-1)
                 .oldFlags(new Flags())
                 .newFlags(new Flags(Flags.Flag.RECENT))
-                .build()),
-            MAILBOX_PATH,
-            MAILBOX_ID);
+                .build()));
         testee.event(update);
 
         assertThat(testee.flagUpdateUids().iterator()).isEmpty();
