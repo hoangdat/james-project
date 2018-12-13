@@ -66,8 +66,7 @@ public interface MailboxListener {
     /**
      * Informs this listener about the given event.
      *
-     * @param event
-     *            not null
+     * @param event not null
      */
     void event(Event event);
 
@@ -316,7 +315,6 @@ public interface MailboxListener {
          * Return the flags which were set for the added message
          *
          * @return flags
-         *
          */
         @Override
         public MessageMetaData getMetaData(MessageUid uid) {
@@ -360,7 +358,7 @@ public interface MailboxListener {
 
         /**
          * Return the flags which were set for the added message
-         * 
+         *
          * @return flags
          */
         public MessageMetaData getMetaData(MessageUid uid) {
@@ -372,5 +370,5 @@ public interface MailboxListener {
             return ImmutableList.copyOf(added.keySet());
         }
     }
-    
+
 }
