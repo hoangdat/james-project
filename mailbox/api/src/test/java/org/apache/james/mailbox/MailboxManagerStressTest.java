@@ -75,8 +75,11 @@ public abstract class MailboxManagerStressTest {
 
             @Override
             public void event(Event event) {
-                MessageUid u = ((Added) event).getUids().get(0);
-                uList.add(u);
+                Collection<MessageUid> uids = ((Added) event).getUids();
+                if (!uids.isEmpty()) {
+                    MessageUid u = uids.iterator().next();
+                    uList.add(u);
+                }
             }
         }, session);
         mailboxManager.endProcessingRequest(session);
