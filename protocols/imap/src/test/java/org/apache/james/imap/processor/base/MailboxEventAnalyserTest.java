@@ -24,6 +24,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.Date;
+
 import javax.mail.Flags;
 
 import org.apache.commons.lang3.NotImplementedException;
@@ -43,10 +45,13 @@ import org.apache.james.mailbox.model.MessageResult;
 import org.apache.james.mailbox.model.MessageResultIterator;
 import org.apache.james.mailbox.model.TestId;
 import org.apache.james.mailbox.model.UpdatedFlags;
+import org.apache.james.mailbox.store.SimpleMessageMetaData;
+import org.apache.james.mailbox.store.mail.model.DefaultMessageId;
 import org.junit.Before;
 import org.junit.Test;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSortedMap;
 
 public class MailboxEventAnalyserTest {
 
@@ -88,6 +93,11 @@ public class MailboxEventAnalyserTest {
     private static final char PATH_DELIMITER = '.';
     private static final MailboxPath MAILBOX_PATH = new MailboxPath("namespace", "user", "name");
     private static final TestId MAILBOX_ID = TestId.of(36);
+    private static final MailboxListener.Added MAILBOX_ADDED_EVENT = new MailboxListener.Added(
+        MAILBOX_SESSION.getSessionId(),
+        MAILBOX_SESSION.getUser().getCoreUser(), MAILBOX_PATH, MAILBOX_ID,
+        ImmutableSortedMap.of(MessageUid.of(11),
+            new SimpleMessageMetaData(MessageUid.of(11), 0, new Flags(), 45, new Date(), new DefaultMessageId())));
 
     private SelectedMailboxImpl testee;
 
@@ -134,16 +144,13 @@ public class MailboxEventAnalyserTest {
 
     @Test
     public void testShouldBeNoSizeChangeOnAdded() {
-        testee.event(new FakeMailboxListenerAdded(MAILBOX_SESSION.getSessionId(),
-            MAILBOX_SESSION.getUser().getCoreUser(),
-            ImmutableList.of(MessageUid.of(11)), MAILBOX_PATH, MAILBOX_ID));
+        testee.event(MAILBOX_ADDED_EVENT);
         assertThat(testee.isSizeChanged()).isTrue();
     }
 
     @Test
     public void testShouldNoSizeChangeAfterReset() {
-        testee.event(new FakeMailboxListenerAdded(MAILBOX_SESSION.getSessionId(),
-            MAILBOX_SESSION.getUser().getCoreUser(), ImmutableList.of(MessageUid.of(11)), MAILBOX_PATH, MAILBOX_ID));
+        testee.event(MAILBOX_ADDED_EVENT);
         testee.resetEvents();
 
         assertThat(testee.isSizeChanged()).isFalse();
