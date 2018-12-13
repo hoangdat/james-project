@@ -46,7 +46,9 @@ import org.apache.james.mailbox.model.MessageResultIterator;
 import org.apache.james.mailbox.model.TestId;
 import org.apache.james.mailbox.model.UpdatedFlags;
 import org.apache.james.mailbox.store.SimpleMessageMetaData;
+import org.apache.james.mailbox.store.event.EventFactory;
 import org.apache.james.mailbox.store.mail.model.DefaultMessageId;
+import org.apache.james.mailbox.store.mail.model.impl.SimpleMailbox;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -93,13 +95,11 @@ public class MailboxEventAnalyserTest {
     private static final char PATH_DELIMITER = '.';
     private static final MailboxPath MAILBOX_PATH = new MailboxPath("namespace", "user", "name");
     private static final TestId MAILBOX_ID = TestId.of(36);
-    private static final MailboxListener.Added MAILBOX_ADDED_EVENT = new MailboxListener.Added(
-        MAILBOX_SESSION.getSessionId(),
-        MAILBOX_SESSION.getUser().getCoreUser(), MAILBOX_PATH, MAILBOX_ID,
-        ImmutableSortedMap.of(MessageUid.of(11),
-            new SimpleMessageMetaData(MessageUid.of(11), 0, new Flags(), 45, new Date(), new DefaultMessageId())));
+    private static final int UID_VALIDITY = 1024;
+    private static final SimpleMailbox DEFAULT_MAILBOX = new SimpleMailbox(MAILBOX_PATH, UID_VALIDITY, MAILBOX_ID);
 
     private SelectedMailboxImpl testee;
+    private EventFactory eventFactory;
 
     @Before
     public void setUp() throws MailboxException {
@@ -130,6 +130,7 @@ public class MailboxEventAnalyserTest {
             .thenReturn(new SingleMessageResultIterator(messageResult));
 
         testee = new SelectedMailboxImpl(mailboxManager, imapSession, MAILBOX_PATH);
+        eventFactory = new EventFactory();
     }
 
     @Test
@@ -144,13 +145,23 @@ public class MailboxEventAnalyserTest {
 
     @Test
     public void testShouldBeNoSizeChangeOnAdded() {
-        testee.event(MAILBOX_ADDED_EVENT);
+        MailboxListener.Added mailboxAdded = eventFactory.added(
+            MAILBOX_SESSION,
+            ImmutableSortedMap.of(MessageUid.of(11),
+                new SimpleMessageMetaData(MessageUid.of(11), 0, new Flags(), 45, new Date(), new DefaultMessageId())),
+            DEFAULT_MAILBOX);
+        testee.event(mailboxAdded);
         assertThat(testee.isSizeChanged()).isTrue();
     }
 
     @Test
     public void testShouldNoSizeChangeAfterReset() {
-        testee.event(MAILBOX_ADDED_EVENT);
+        MailboxListener.Added mailboxAdded = eventFactory.added(
+            MAILBOX_SESSION,
+            ImmutableSortedMap.of(MessageUid.of(11),
+                new SimpleMessageMetaData(MessageUid.of(11), 0, new Flags(), 45, new Date(), new DefaultMessageId())),
+            DEFAULT_MAILBOX);
+        testee.event(mailboxAdded);
         testee.resetEvents();
 
         assertThat(testee.isSizeChanged()).isFalse();
@@ -158,12 +169,10 @@ public class MailboxEventAnalyserTest {
 
     @Test
     public void testShouldNotSetUidWhenNoSystemFlagChange() {
-        MailboxListener.FlagsUpdated update = new MailboxListener.FlagsUpdated(
-            MAILBOX_SESSION.getSessionId(),
-            MAILBOX_SESSION.getUser().getCoreUser(),
-            MAILBOX_PATH,
-            MAILBOX_ID,
+        MailboxListener.FlagsUpdated update = eventFactory.flagsUpdated(
+            MAILBOX_SESSION,
             ImmutableList.of(MessageUid.of(90L)),
+            DEFAULT_MAILBOX,
             ImmutableList.of(UpdatedFlags.builder()
                 .uid(MessageUid.of(90))
                 .modSeq(-1)
@@ -179,12 +188,10 @@ public class MailboxEventAnalyserTest {
     public void testShouldSetUidWhenSystemFlagChange() {
         MessageUid uid = MessageUid.of(900);
         
-        MailboxListener.FlagsUpdated update = new MailboxListener.FlagsUpdated(
-            OTHER_MAILBOX_SESSION.getSessionId(),
-            OTHER_MAILBOX_SESSION.getUser().getCoreUser(),
-            MAILBOX_PATH,
-            MAILBOX_ID,
+        MailboxListener.FlagsUpdated update = eventFactory.flagsUpdated(
+            OTHER_MAILBOX_SESSION,
             ImmutableList.of(uid),
+            DEFAULT_MAILBOX,
             ImmutableList.of(UpdatedFlags.builder()
                 .uid(uid)
                 .modSeq(-1)
@@ -201,12 +208,10 @@ public class MailboxEventAnalyserTest {
         MessageUid uid = MessageUid.of(900);
         SelectedMailboxImpl analyser = this.testee;
         
-        MailboxListener.FlagsUpdated update = new MailboxListener.FlagsUpdated(
-            MAILBOX_SESSION.getSessionId(),
-            MAILBOX_SESSION.getUser().getCoreUser(),
-            MAILBOX_PATH,
-            MAILBOX_ID,
+        MailboxListener.FlagsUpdated update = eventFactory.flagsUpdated(
+            MAILBOX_SESSION,
             ImmutableList.of(uid),
+            DEFAULT_MAILBOX,
             ImmutableList.of(UpdatedFlags.builder()
                 .uid(uid)
                 .modSeq(-1)
@@ -224,12 +229,10 @@ public class MailboxEventAnalyserTest {
     public void testShouldSetUidWhenSystemFlagChangeDifferentSessionInSilentMode() {
         MessageUid uid = MessageUid.of(900);
 
-        MailboxListener.FlagsUpdated update = new MailboxListener.FlagsUpdated(
-            OTHER_MAILBOX_SESSION.getSessionId(),
-            OTHER_MAILBOX_SESSION.getUser().getCoreUser(),
-            MAILBOX_PATH,
-            MAILBOX_ID,
+        MailboxListener.FlagsUpdated update = eventFactory.flagsUpdated(
+            OTHER_MAILBOX_SESSION,
             ImmutableList.of(uid),
+            DEFAULT_MAILBOX,
             ImmutableList.of(UpdatedFlags.builder()
                 .uid(uid)
                 .modSeq(-1)
@@ -245,12 +248,10 @@ public class MailboxEventAnalyserTest {
 
     @Test
     public void testShouldNotSetUidWhenSystemFlagChangeSameSessionInSilentMode() {
-        MailboxListener.FlagsUpdated update = new MailboxListener.FlagsUpdated(
-            MAILBOX_SESSION.getSessionId(),
-            MAILBOX_SESSION.getUser().getCoreUser(),
-            MAILBOX_PATH,
-            MAILBOX_ID,
+        MailboxListener.FlagsUpdated update = eventFactory.flagsUpdated(
+            MAILBOX_SESSION,
             ImmutableList.of(MessageUid.of(345)),
+            DEFAULT_MAILBOX,
             ImmutableList.of(UpdatedFlags.builder()
                 .uid(MessageUid.of(345))
                 .modSeq(-1)
@@ -266,12 +267,10 @@ public class MailboxEventAnalyserTest {
 
     @Test
     public void testShouldNotSetUidWhenOnlyRecentFlagUpdated() {
-        MailboxListener.FlagsUpdated update = new MailboxListener.FlagsUpdated(
-            MAILBOX_SESSION.getSessionId(),
-            MAILBOX_SESSION.getUser().getCoreUser(),
-            MAILBOX_PATH,
-            MAILBOX_ID,
+        MailboxListener.FlagsUpdated update = eventFactory.flagsUpdated(
+            MAILBOX_SESSION,
             ImmutableList.of(MessageUid.of(886)),
+            DEFAULT_MAILBOX,
             ImmutableList.of(UpdatedFlags.builder()
                 .uid(MessageUid.of(886))
                 .modSeq(-1)
