@@ -20,7 +20,6 @@
 package org.apache.james.mailbox;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -39,8 +38,6 @@ import org.apache.james.mailbox.model.UpdatedFlags;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
-import com.google.errorprone.annotations.Immutable;
 
 
 /**
@@ -330,7 +327,7 @@ public interface MailboxListener {
     /**
      * A mailbox event related to updated flags
      */
-     class FlagsUpdated extends MessageEvent {
+    class FlagsUpdated extends MessageEvent {
         private final List<MessageUid> uids;
         private final List<UpdatedFlags> updatedFlags;
 
@@ -353,7 +350,7 @@ public interface MailboxListener {
     /**
      * A mailbox event related to added message
      */
-     class Added extends MetaDataHoldingEvent {
+    class Added extends MetaDataHoldingEvent {
         private final Map<MessageUid, MessageMetaData> added;
 
         public Added(MailboxSession.SessionId sessionId, User user, MailboxPath path, MailboxId mailboxId, SortedMap<MessageUid, MessageMetaData> uids) {
