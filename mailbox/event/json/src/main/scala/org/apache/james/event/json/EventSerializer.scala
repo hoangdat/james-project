@@ -27,7 +27,7 @@ import org.apache.james.core.quota.{QuotaCount, QuotaSize, QuotaValue}
 import org.apache.james.core.{Domain, User}
 import org.apache.james.mailbox.MailboxListener.{MailboxACLUpdated => JavaMailboxACLUpdated, MailboxAdded => JavaMailboxAdded, MailboxDeletion => JavaMailboxDeletion, MailboxRenamed => JavaMailboxRenamed, QuotaUsageUpdatedEvent => JavaQuotaUsageUpdatedEvent}
 import org.apache.james.mailbox.MailboxSession.SessionId
-import org.apache.james.mailbox.model.{MailboxACL, MailboxId, QuotaRoot, MailboxACL => JavaMailboxACL, Quota => JavaQuota}
+import org.apache.james.mailbox.model.{MailboxId, QuotaRoot, MailboxACL => JavaMailboxACL, Quota => JavaQuota}
 import org.apache.james.mailbox.{Event => JavaEvent}
 import play.api.libs.json.{JsError, JsNull, JsNumber, JsObject, JsResult, JsString, JsSuccess, Json, OFormat, Reads, Writes}
 
@@ -57,6 +57,7 @@ private object DTO {
     override def toJava: JavaEvent = new JavaMailboxDeletion(sessionId, user, path.toJava, quotaRoot, deletedMessageCount,
       totalDeletedSize,
       mailboxId)
+  }
 
   case class MailboxACLUpdated(sessionId: SessionId, user: User, mailboxPath: MailboxPath, aclDiff: ACLDiff, mailboxId: MailboxId) extends Event {
     override def toJava: JavaEvent = new JavaMailboxACLUpdated(sessionId, user, mailboxPath.toJava, aclDiff.toJava, mailboxId)
@@ -130,12 +131,12 @@ private class JsonSerialize(mailboxIdFactory: MailboxId.Factory) {
   implicit val mailboxAclWrites: Writes[MailboxACL] = Json.writes[MailboxACL]
   implicit val aclDiffWrites: Writes[ACLDiff] = Json.writes[ACLDiff]
 
-  implicit val aclEntryKeyReads: Reads[MailboxACL.EntryKey] = {
-    case JsString(keyAsString) => JsSuccess(MailboxACL.EntryKey.deserialize(keyAsString))
+  implicit val aclEntryKeyReads: Reads[JavaMailboxACL.EntryKey] = {
+    case JsString(keyAsString) => JsSuccess(JavaMailboxACL.EntryKey.deserialize(keyAsString))
     case _ => JsError()
   }
-  implicit val aclRightsReads: Reads[MailboxACL.Rfc4314Rights] = {
-    case JsString(rightsAsString) => JsSuccess(MailboxACL.Rfc4314Rights.deserialize(rightsAsString))
+  implicit val aclRightsReads: Reads[JavaMailboxACL.Rfc4314Rights] = {
+    case JsString(rightsAsString) => JsSuccess(JavaMailboxACL.Rfc4314Rights.deserialize(rightsAsString))
     case _ => JsError()
   }
   implicit val userReads: Reads[User] = {
@@ -176,6 +177,16 @@ private class JsonSerialize(mailboxIdFactory: MailboxId.Factory) {
 
   implicit def scopeMapWrite[V](implicit vr: Writes[V]): Writes[Map[JavaQuota.Scope, V]] =
     (m: Map[JavaQuota.Scope, V]) => {
+      JsObject(m.map { case (k, v) => (k.toString, vr.writes(v)) }.toSeq)
+    }
+
+  implicit def scopeMapReadsACL[V](implicit vr: Reads[V]): Reads[Map[JavaMailboxACL.EntryKey, V]] =
+    Reads.mapReads[JavaMailboxACL.EntryKey, V] { str =>
+      Json.fromJson[JavaMailboxACL.EntryKey](JsString(str))
+    }
+
+  implicit def scopeMapWriteACL[V](implicit vr: Writes[V]): Writes[Map[JavaMailboxACL.EntryKey, V]] =
+    (m: Map[JavaMailboxACL.EntryKey, V]) => {
       JsObject(m.map { case (k, v) => (k.toString, vr.writes(v)) }.toSeq)
     }
 
