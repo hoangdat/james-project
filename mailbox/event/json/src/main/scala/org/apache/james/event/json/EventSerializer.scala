@@ -25,9 +25,9 @@ import java.util.Optional
 import julienrf.json.derived
 import org.apache.james.core.quota.{QuotaCount, QuotaSize, QuotaValue}
 import org.apache.james.core.{Domain, User}
-import org.apache.james.mailbox.MailboxListener.{MailboxAdded => JavaMailboxAdded, MailboxDeletion => JavaMailboxDeletion, MailboxRenamed => JavaMailboxRenamed, QuotaUsageUpdatedEvent => JavaQuotaUsageUpdatedEvent}
+import org.apache.james.mailbox.MailboxListener.{MailboxACLUpdated => JavaMailboxACLUpdated, MailboxAdded => JavaMailboxAdded, MailboxDeletion => JavaMailboxDeletion, MailboxRenamed => JavaMailboxRenamed, QuotaUsageUpdatedEvent => JavaQuotaUsageUpdatedEvent}
 import org.apache.james.mailbox.MailboxSession.SessionId
-import org.apache.james.mailbox.model.{MailboxId, QuotaRoot, Quota => JavaQuota}
+import org.apache.james.mailbox.model.{MailboxACL, MailboxId, QuotaRoot, MailboxACL => JavaMailboxACL, Quota => JavaQuota}
 import org.apache.james.mailbox.{Event => JavaEvent}
 import play.api.libs.json.{JsError, JsNull, JsNumber, JsObject, JsResult, JsString, JsSuccess, Json, OFormat, Reads, Writes}
 
@@ -57,6 +57,9 @@ private object DTO {
     override def toJava: JavaEvent = new JavaMailboxDeletion(sessionId, user, path.toJava, quotaRoot, deletedMessageCount,
       totalDeletedSize,
       mailboxId)
+
+  case class MailboxACLUpdated(sessionId: SessionId, user: User, mailboxPath: MailboxPath, aclDiff: ACLDiff, mailboxId: MailboxId) extends Event {
+    override def toJava: JavaEvent = new JavaMailboxACLUpdated(sessionId, user, mailboxPath.toJava, aclDiff.toJava, mailboxId)
   }
 }
 
@@ -95,11 +98,19 @@ private object ScalaConverter {
     totalDeletedSize = event.getTotalDeletedSize,
     mailboxId = event.getMailboxId)
 
+  private def toScala(event: JavaMailboxACLUpdated): DTO.MailboxACLUpdated = DTO.MailboxACLUpdated(
+    sessionId = event.getSessionId,
+    user = event.getUser,
+    mailboxPath = MailboxPath.fromJava(event.getMailboxPath),
+    aclDiff = ACLDiff.fromJava(event.getAclDiff),
+    mailboxId = event.getMailboxId)
+
   def toScala(javaEvent: JavaEvent): Event = javaEvent match {
     case e: JavaQuotaUsageUpdatedEvent => toScala(e)
     case e: JavaMailboxAdded => toScala(e)
     case e: JavaMailboxRenamed => toScala(e)
     case e: JavaMailboxDeletion => toScala(e)
+    case e: JavaMailboxACLUpdated => toScala(e)
     case _ => throw new RuntimeException("no Scala convertion known")
   }
 }
@@ -114,7 +125,19 @@ private class JsonSerialize(mailboxIdFactory: MailboxId.Factory) {
   implicit val mailboxPathWrites: Writes[MailboxPath] = Json.writes[MailboxPath]
   implicit val mailboxIdWrites: Writes[MailboxId] = value => JsString(value.serialize())
   implicit val sessionIdWrites: Writes[SessionId] = value => JsNumber(value.getValue)
+  implicit val aclEntryKeyWrites: Writes[JavaMailboxACL.EntryKey] = value => JsString(value.serialize())
+  implicit val aclRightsWrites: Writes[JavaMailboxACL.Rfc4314Rights] = value => JsString(value.serialize())
+  implicit val mailboxAclWrites: Writes[MailboxACL] = Json.writes[MailboxACL]
+  implicit val aclDiffWrites: Writes[ACLDiff] = Json.writes[ACLDiff]
 
+  implicit val aclEntryKeyReads: Reads[MailboxACL.EntryKey] = {
+    case JsString(keyAsString) => JsSuccess(MailboxACL.EntryKey.deserialize(keyAsString))
+    case _ => JsError()
+  }
+  implicit val aclRightsReads: Reads[MailboxACL.Rfc4314Rights] = {
+    case JsString(rightsAsString) => JsSuccess(MailboxACL.Rfc4314Rights.deserialize(rightsAsString))
+    case _ => JsError()
+  }
   implicit val userReads: Reads[User] = {
     case JsString(userAsString) => JsSuccess(User.fromUsername(userAsString))
     case _ => JsError()
@@ -159,6 +182,8 @@ private class JsonSerialize(mailboxIdFactory: MailboxId.Factory) {
   implicit val quotaCReads: Reads[Quota[QuotaCount]] = Json.reads[Quota[QuotaCount]]
   implicit val quotaSReads: Reads[Quota[QuotaSize]] = Json.reads[Quota[QuotaSize]]
   implicit val mailboxPathReads: Reads[MailboxPath] = Json.reads[MailboxPath]
+  implicit val mailboxAclReads: Reads[MailboxACL] = Json.reads[MailboxACL]
+  implicit val aclDiffReads: Reads[ACLDiff] = Json.reads[ACLDiff]
 
   implicit val eventOFormat: OFormat[Event] = derived.oformat()
 
