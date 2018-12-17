@@ -25,6 +25,7 @@ import java.util.Optional
 import julienrf.json.derived
 import org.apache.james.core.quota.{QuotaCount, QuotaSize, QuotaValue}
 import org.apache.james.core.{Domain, User}
+import org.apache.james.event.json.DTOs.{ACLDiff, MailboxPath, Quota}
 import org.apache.james.mailbox.MailboxListener.{MailboxACLUpdated => JavaMailboxACLUpdated, MailboxAdded => JavaMailboxAdded, MailboxDeletion => JavaMailboxDeletion, MailboxRenamed => JavaMailboxRenamed, QuotaUsageUpdatedEvent => JavaQuotaUsageUpdatedEvent}
 import org.apache.james.mailbox.MailboxSession.SessionId
 import org.apache.james.mailbox.model.{MailboxId, QuotaRoot, MailboxACL => JavaMailboxACL, Quota => JavaQuota}

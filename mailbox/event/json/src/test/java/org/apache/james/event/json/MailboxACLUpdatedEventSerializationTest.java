@@ -24,7 +24,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.NoSuchElementException;
-import java.util.stream.Collectors;
 
 import org.apache.james.core.User;
 import org.apache.james.mailbox.Event;
@@ -41,8 +40,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.core.JsonParseException;
-import com.google.common.collect.ImmutableCollection;
-import com.google.common.collect.ImmutableList;
 
 class MailboxACLUpdatedEventSerializationTest {
 
