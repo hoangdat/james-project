@@ -1,0 +1,23 @@
+{
+  "MailboxACLUpdated": {
+    "mailboxPath": {
+      "namespace": "#private",
+      "user": "bob",
+      "name": "mailboxName"
+    },
+    "aclDiff": {
+      "oldACL": {
+        "entries": {}
+      },
+      "newACL": {
+        "entries": {
+          "$any": "ar",
+          "alice": "i"
+        }
+      }
+    },
+    "mailboxId": "23",
+    "sessionId": 6,
+    "user": "user"
+  }
+}

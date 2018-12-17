@@ -35,6 +35,7 @@ import org.apache.james.mailbox.model.MailboxACL;
 import org.apache.james.mailbox.model.MailboxConstants;
 import org.apache.james.mailbox.model.MailboxPath;
 import org.apache.james.mailbox.model.TestId;
+import org.apache.james.util.ClassLoaderUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -90,6 +91,13 @@ class MailboxACLUpdatedEventSerializationTest {
     @Test
     void mailboxACLUpdatedShouldBeDeserialized() {
         assertThat(EVENT_SERIALIZER.fromJson(JSON_1).get())
+            .isEqualTo(mailboxACLUpdatedEvent);
+    }
+
+    @Test
+    void mailboxACLUpdatedShouldBeDeserializedFromFile() {
+        assertThat(EVENT_SERIALIZER.fromJson(ClassLoaderUtils
+            .getSystemResourceAsString("mailboxACLUpdated.json")).get())
             .isEqualTo(mailboxACLUpdatedEvent);
     }
 
@@ -442,7 +450,7 @@ class MailboxACLUpdatedEventSerializationTest {
             }
 
             @Test
-            void mailboxAddedShouldThrowWhenMailboxIdIsANumber() {
+            void mailboxACLUpdatedShouldThrowWhenMailboxIdIsANumber() {
                 assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
                     "{" +
                     "  \"MailboxACLUpdated\":{" +
@@ -469,7 +477,7 @@ class MailboxACLUpdatedEventSerializationTest {
             @Nested
             class DeserializationErrorOnNameSpace {
                 @Test
-                void mailboxAddedShouldThrowWhenNameSpaceIsNotAString() {
+                void mailboxACLUpdatedShouldThrowWhenNameSpaceIsNotAString() {
                     assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
                         "{" +
                         "  \"MailboxACLUpdated\":{" +
@@ -493,7 +501,7 @@ class MailboxACLUpdatedEventSerializationTest {
             @Nested
             class DeserializationErrorOnUser {
                 @Test
-                void mailboxAddedShouldThrowWhenUserIsNotAString() {
+                void mailboxACLUpdatedShouldThrowWhenUserIsNotAString() {
                     assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
                         "{" +
                         "  \"MailboxACLUpdated\":{" +
@@ -518,7 +526,7 @@ class MailboxACLUpdatedEventSerializationTest {
             class DeserializationErrorOnMailboxName {
 
                 @Test
-                void mailboxAddedShouldThrowWhenNullMailboxName() {
+                void mailboxACLUpdatedShouldThrowWhenNullMailboxName() {
                     assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
                         "{" +
                         "  \"MailboxACLUpdated\":{" +
@@ -539,7 +547,7 @@ class MailboxACLUpdatedEventSerializationTest {
                 }
 
                 @Test
-                void mailboxAddedShouldThrowWhenMailboxNameIdIsANumber() {
+                void mailboxACLUpdatedShouldThrowWhenMailboxNameIdIsANumber() {
                     assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
                         "{" +
                         "  \"MailboxACLUpdated\":{" +
