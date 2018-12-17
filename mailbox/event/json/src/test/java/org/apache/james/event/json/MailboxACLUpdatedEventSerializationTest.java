@@ -20,6 +20,7 @@
 package org.apache.james.event.json;
 
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
+import static org.apache.james.util.ClassLoaderUtils.getSystemResourceAsString;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -34,7 +35,6 @@ import org.apache.james.mailbox.model.MailboxACL;
 import org.apache.james.mailbox.model.MailboxConstants;
 import org.apache.james.mailbox.model.MailboxPath;
 import org.apache.james.mailbox.model.TestId;
-import org.apache.james.util.ClassLoaderUtils;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -58,39 +58,17 @@ class MailboxACLUpdatedEventSerializationTest {
                 ACLDiff.computeDiff(MailboxACL.EMPTY, MAILBOX_ACL),
                 TestId.of(23));
 
-    private static final String JSON_1 = "{" +
-        "  \"MailboxACLUpdated\":{" +
-        "    \"mailboxPath\":{" +
-        "       \"namespace\":\"#private\"," +
-        "       \"user\":\"bob\"," +
-        "       \"name\":\"mailboxName\"" +
-        "      }," +
-        "    \"aclDiff\":{" +
-        "       \"oldACL\":{}," +
-        "       \"newACL\":{\"$any\":\"ar\", \"-alice\":\"i\"}}," +
-        "    \"mailboxId\":\"23\"," +
-        "    \"sessionId\":6," +
-        "    \"user\":\"user\"" +
-        "   }" +
-        "}";
-
+    private static final String MAILBOX_ACL_UPDATED_JSON = getSystemResourceAsString("mailboxACL.json");
 
     @Test
     void mailboxACLUpdatedShouldBeSerialized() {
         assertThatJson(EVENT_SERIALIZER.toJson(MAILBOX_ACL_UPDATED))
-            .isEqualTo(JSON_1);
+            .isEqualTo(MAILBOX_ACL_UPDATED_JSON);
     }
 
     @Test
     void mailboxACLUpdatedShouldBeDeserialized() {
-        assertThat(EVENT_SERIALIZER.fromJson(JSON_1).get())
-            .isEqualTo(MAILBOX_ACL_UPDATED);
-    }
-
-    @Test
-    void mailboxACLUpdatedShouldBeDeserializedFromFile() {
-        assertThat(EVENT_SERIALIZER.fromJson(ClassLoaderUtils
-            .getSystemResourceAsString("mailboxACL.json")).get())
+        assertThat(EVENT_SERIALIZER.fromJson(MAILBOX_ACL_UPDATED_JSON).get())
             .isEqualTo(MAILBOX_ACL_UPDATED);
     }
 
@@ -116,7 +94,7 @@ class MailboxACLUpdatedEventSerializationTest {
                 new MailboxACL.Entry(ENTRY_KEY, RIGHTS));
 
         private final MailboxListener.MailboxACLUpdated UPDATED_EVENT = new MailboxListener.MailboxACLUpdated(
-                MailboxSession.SessionId.of(06),
+                MailboxSession.SessionId.of(6),
                 USER,
                 new MailboxPath(MailboxConstants.USER_NAMESPACE, NULL_USER, "mailboxName"),
                 ACLDiff.computeDiff(MailboxACL.EMPTY, MAILBOX_ACL),
@@ -168,7 +146,7 @@ class MailboxACLUpdatedEventSerializationTest {
         @Test
         void mailboxACLUpdatedShouldBeWellSerializedWithNullRight() {
             assertThatJson(EVENT_SERIALIZER.toJson(mailboxACLUpdated))
-                            .isEqualTo(jsonNullRight);
+                .isEqualTo(jsonNullRight);
         }
 
         @Test
