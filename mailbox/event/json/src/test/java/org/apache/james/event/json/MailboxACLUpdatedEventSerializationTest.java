@@ -26,7 +26,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.NoSuchElementException;
 
 import org.apache.james.core.User;
-import org.apache.james.mailbox.Event;
 import org.apache.james.mailbox.MailboxListener;
 import org.apache.james.mailbox.MailboxSession;
 import org.apache.james.mailbox.acl.ACLDiff;
@@ -78,16 +77,12 @@ class MailboxACLUpdatedEventSerializationTest {
 
     @Test
     void mailboxACLUpdatedShouldBeSerialized() {
-        String x = EVENT_SERIALIZER.toJson(MAILBOX_ACL_UPDATED);
-                System.out.println(x);
         assertThatJson(EVENT_SERIALIZER.toJson(MAILBOX_ACL_UPDATED))
             .isEqualTo(JSON_1);
     }
 
     @Test
     void mailboxACLUpdatedShouldBeDeserialized() {
-        Event x = EVENT_SERIALIZER.fromJson(JSON_1).get();
-        System.out.println(x);
         assertThat(EVENT_SERIALIZER.fromJson(JSON_1).get())
             .isEqualTo(MAILBOX_ACL_UPDATED);
     }
@@ -172,8 +167,6 @@ class MailboxACLUpdatedEventSerializationTest {
 
         @Test
         void mailboxACLUpdatedShouldBeWellSerializedWithNullRight() {
-            String x = EVENT_SERIALIZER.toJson(mailboxACLUpdated);
-            System.out.println(x);
             assertThatJson(EVENT_SERIALIZER.toJson(mailboxACLUpdated))
                             .isEqualTo(jsonNullRight);
         }
