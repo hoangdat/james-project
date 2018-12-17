@@ -154,7 +154,49 @@ class MailboxACLUpdatedEventSerializationTest {
             assertThat(EVENT_SERIALIZER.fromJson(jsonNullRight).get())
                 .isEqualTo(mailboxACLUpdated);
         }
+    }
 
+    @Nested
+    class DoubleRightInMailboxACL {
+
+        private final String jsonDoubleRight =
+            "{" +
+            "  \"MailboxACLUpdated\":{" +
+            "    \"mailboxPath\":{" +
+            "       \"namespace\":\"#private\"," +
+            "       \"user\":\"bob\"," +
+            "       \"name\":\"mailboxName\"" +
+            "      }," +
+            "    \"aclDiff\":{" +
+            "       \"oldACL\":{\"$any\":\"aa\"}," +
+            "       \"newACL\":{}}," +
+            "    \"mailboxId\":\"23\"," +
+            "    \"sessionId\":6," +
+            "    \"user\":\"user\"" +
+            "   }" +
+            "}";
+
+        private final MailboxACL mailboxACL = new MailboxACL(
+            new MailboxACL.Entry(ENTRY_KEY, new MailboxACL.Rfc4314Rights(MailboxACL.Right.Administer)));
+
+        private final MailboxListener.MailboxACLUpdated mailboxACLUpdated = new MailboxListener.MailboxACLUpdated(
+            MailboxSession.SessionId.of(6),
+            USER,
+            new MailboxPath(MailboxConstants.USER_NAMESPACE, "bob", "mailboxName"),
+            ACLDiff.computeDiff(mailboxACL, MailboxACL.EMPTY),
+            TestId.of(23));
+
+        @Test
+        void mailboxACLUpdatedShouldBeWellSerializedWithNullRight() {
+            assertThatJson(EVENT_SERIALIZER.toJson(mailboxACLUpdated))
+                .isNotEqualTo(jsonDoubleRight);
+        }
+
+        @Test
+        void mailboxACLUpdatedShouldBeWellDeSerializedWithNullUser() {
+            assertThat(EVENT_SERIALIZER.fromJson(jsonDoubleRight).get())
+                .isEqualTo(mailboxACLUpdated);
+        }
     }
 
     @Nested
