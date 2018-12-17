@@ -27,15 +27,12 @@ import scala.collection.JavaConverters._
 
 object ACLDiff {
   def fromJava(javaACLDiff: JavaACLDiff): ACLDiff = ACLDiff(
-    MailboxACL(javaACLDiff.getOldACL.getEntries.asScala.toMap),
-    MailboxACL(javaACLDiff.getNewACL.getEntries.asScala.toMap)
+    javaACLDiff.getOldACL.getEntries.asScala.toMap,
+    javaACLDiff.getNewACL.getEntries.asScala.toMap
   )
 }
 
-case class MailboxACL(entries: Map[JavaMailboxACL.EntryKey, JavaMailboxACL.Rfc4314Rights]) {
-  def toJava: JavaMailboxACL = new JavaMailboxACL(entries.asJava)
-}
-
-case class ACLDiff(oldACL: MailboxACL, newACL: MailboxACL) {
-  def toJava: JavaACLDiff = new JavaACLDiff(oldACL.toJava, newACL.toJava)
+case class ACLDiff(oldACL: Map[JavaMailboxACL.EntryKey, JavaMailboxACL.Rfc4314Rights],
+                   newACL: Map[JavaMailboxACL.EntryKey, JavaMailboxACL.Rfc4314Rights]) {
+  def toJava: JavaACLDiff = new JavaACLDiff(new JavaMailboxACL(oldACL.asJava), new JavaMailboxACL(newACL.asJava))
 }

@@ -6,14 +6,10 @@
       "name": "mailboxName"
     },
     "aclDiff": {
-      "oldACL": {
-        "entries": {}
-      },
+      "oldACL": {},
       "newACL": {
-        "entries": {
-          "$any": "ar",
-          "alice": "i"
-        }
+        "$any": "ar",
+        "-alice": "i"
       }
     },
     "mailboxId": "23",

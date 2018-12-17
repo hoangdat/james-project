@@ -128,7 +128,6 @@ private class JsonSerialize(mailboxIdFactory: MailboxId.Factory) {
   implicit val sessionIdWrites: Writes[SessionId] = value => JsNumber(value.getValue)
   implicit val aclEntryKeyWrites: Writes[JavaMailboxACL.EntryKey] = value => JsString(value.serialize())
   implicit val aclRightsWrites: Writes[JavaMailboxACL.Rfc4314Rights] = value => JsString(value.serialize())
-  implicit val mailboxAclWrites: Writes[MailboxACL] = Json.writes[MailboxACL]
   implicit val aclDiffWrites: Writes[ACLDiff] = Json.writes[ACLDiff]
 
   implicit val aclEntryKeyReads: Reads[JavaMailboxACL.EntryKey] = {
@@ -193,7 +192,6 @@ private class JsonSerialize(mailboxIdFactory: MailboxId.Factory) {
   implicit val quotaCReads: Reads[Quota[QuotaCount]] = Json.reads[Quota[QuotaCount]]
   implicit val quotaSReads: Reads[Quota[QuotaSize]] = Json.reads[Quota[QuotaSize]]
   implicit val mailboxPathReads: Reads[MailboxPath] = Json.reads[MailboxPath]
-  implicit val mailboxAclReads: Reads[MailboxACL] = Json.reads[MailboxACL]
   implicit val aclDiffReads: Reads[ACLDiff] = Json.reads[ACLDiff]
 
   implicit val eventOFormat: OFormat[Event] = derived.oformat()

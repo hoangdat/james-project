@@ -24,28 +24,44 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
 
 import org.apache.james.core.User;
+import org.apache.james.mailbox.Event;
 import org.apache.james.mailbox.MailboxListener;
 import org.apache.james.mailbox.MailboxSession;
 import org.apache.james.mailbox.acl.ACLDiff;
 import org.apache.james.mailbox.exception.UnsupportedRightException;
-import org.apache.james.mailbox.fixture.MailboxFixture;
 import org.apache.james.mailbox.model.MailboxACL;
 import org.apache.james.mailbox.model.MailboxConstants;
 import org.apache.james.mailbox.model.MailboxPath;
 import org.apache.james.mailbox.model.TestId;
 import org.apache.james.util.ClassLoaderUtils;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+
+import com.fasterxml.jackson.core.JsonParseException;
+import com.google.common.collect.ImmutableCollection;
+import com.google.common.collect.ImmutableList;
 
 class MailboxACLUpdatedEventSerializationTest {
 
     private static final User USER = User.fromUsername("user");
     private static final MailboxACL.EntryKey ENTRY_KEY = org.apache.james.mailbox.model.MailboxACL.EntryKey.createGroupEntryKey("any", false);
-    private static final MailboxACL.Rfc4314Rights RIGHTS = new org.apache.james.mailbox.model.MailboxACL.Rfc4314Rights(MailboxACL.Right.Administer, MailboxACL.Right.Read);
+    private static final MailboxACL.Rfc4314Rights RIGHTS = new MailboxACL.Rfc4314Rights(MailboxACL.Right.Administer, MailboxACL.Right.Read);
     private static final EventSerializer EVENT_SERIALIZER = new EventSerializer(new TestId.Factory());
+    private static final MailboxACL MAILBOX_ACL = new MailboxACL(
+        new MailboxACL.Entry(ENTRY_KEY, RIGHTS),
+        new MailboxACL.Entry(MailboxACL.EntryKey.createUserEntryKey("alice", true),
+            new MailboxACL.Rfc4314Rights(MailboxACL.Right.Insert)));
+
+    private static final MailboxListener.MailboxACLUpdated MAILBOX_ACL_UPDATED = new MailboxListener.MailboxACLUpdated(
+                MailboxSession.SessionId.of(6),
+                USER,
+                new MailboxPath(MailboxConstants.USER_NAMESPACE, "bob", "mailboxName"),
+                ACLDiff.computeDiff(MailboxACL.EMPTY, MAILBOX_ACL),
+                TestId.of(23));
+
     private static final String JSON_1 = "{" +
         "  \"MailboxACLUpdated\":{" +
         "    \"mailboxPath\":{" +
@@ -54,51 +70,36 @@ class MailboxACLUpdatedEventSerializationTest {
         "       \"name\":\"mailboxName\"" +
         "      }," +
         "    \"aclDiff\":{" +
-        "       \"oldACL\":{\"entries\":{}}," +
-        "       \"newACL\":{\"entries\":{\"$any\":\"ar\", \"alice\":\"i\"}}}," +
+        "       \"oldACL\":{}," +
+        "       \"newACL\":{\"$any\":\"ar\", \"-alice\":\"i\"}}," +
         "    \"mailboxId\":\"23\"," +
         "    \"sessionId\":6," +
         "    \"user\":\"user\"" +
         "   }" +
         "}";
 
-    private MailboxListener.MailboxACLUpdated mailboxACLUpdatedEvent;
-
-    @BeforeEach
-    void setUp() throws UnsupportedRightException {
-        MailboxACL mailboxACL = MailboxACL.EMPTY.apply(
-            MailboxACL.command()
-                .key(ENTRY_KEY)
-                .rights(RIGHTS)
-                .asAddition())
-            .union(new MailboxACL(new MailboxACL.Entry(MailboxFixture.ALICE, MailboxACL.Right.Insert)));
-        mailboxACLUpdatedEvent = new MailboxListener.MailboxACLUpdated(
-            MailboxSession.SessionId.of(06),
-            USER,
-            new MailboxPath(MailboxConstants.USER_NAMESPACE, "bob", "mailboxName"),
-            ACLDiff.computeDiff(MailboxACL.EMPTY, mailboxACL),
-            TestId.of(23));
-    }
 
     @Test
     void mailboxACLUpdatedShouldBeSerialized() {
-        String x = EVENT_SERIALIZER.toJson(mailboxACLUpdatedEvent);
-        System.out.println(x);
-        assertThatJson(EVENT_SERIALIZER.toJson(mailboxACLUpdatedEvent))
+        String x = EVENT_SERIALIZER.toJson(MAILBOX_ACL_UPDATED);
+                System.out.println(x);
+        assertThatJson(EVENT_SERIALIZER.toJson(MAILBOX_ACL_UPDATED))
             .isEqualTo(JSON_1);
     }
 
     @Test
     void mailboxACLUpdatedShouldBeDeserialized() {
+        Event x = EVENT_SERIALIZER.fromJson(JSON_1).get();
+        System.out.println(x);
         assertThat(EVENT_SERIALIZER.fromJson(JSON_1).get())
-            .isEqualTo(mailboxACLUpdatedEvent);
+            .isEqualTo(MAILBOX_ACL_UPDATED);
     }
 
     @Test
     void mailboxACLUpdatedShouldBeDeserializedFromFile() {
         assertThat(EVENT_SERIALIZER.fromJson(ClassLoaderUtils
-            .getSystemResourceAsString("mailboxACLUpdated.json")).get())
-            .isEqualTo(mailboxACLUpdatedEvent);
+            .getSystemResourceAsString("mailboxACL.json")).get())
+            .isEqualTo(MAILBOX_ACL_UPDATED);
     }
 
     @Nested
@@ -111,42 +112,81 @@ class MailboxACLUpdatedEventSerializationTest {
             "       \"name\":\"mailboxName\"" +
             "      }," +
             "    \"aclDiff\":{" +
-            "       \"oldACL\":{\"entries\":{}}," +
-            "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+            "       \"oldACL\":{}," +
+            "       \"newACL\":{\"$any\":\"ar\"}}," +
             "    \"mailboxId\":\"23\"," +
             "    \"sessionId\":6," +
             "    \"user\":\"user\"" +
             "   }" +
             "}";
 
-        private MailboxListener.MailboxACLUpdated mailboxACLUpdatedEvent;
+        private final MailboxACL MAILBOX_ACL= new MailboxACL(
+                new MailboxACL.Entry(ENTRY_KEY, RIGHTS));
 
-        @BeforeEach
-        void setUp() throws UnsupportedRightException {
-            MailboxACL mailboxACL = MailboxACL.EMPTY.apply(
-                MailboxACL.command()
-                    .key(ENTRY_KEY)
-                    .rights(RIGHTS)
-                    .asAddition());
-            mailboxACLUpdatedEvent = new MailboxListener.MailboxACLUpdated(
+        private final MailboxListener.MailboxACLUpdated UPDATED_EVENT = new MailboxListener.MailboxACLUpdated(
                 MailboxSession.SessionId.of(06),
                 USER,
                 new MailboxPath(MailboxConstants.USER_NAMESPACE, NULL_USER, "mailboxName"),
-                ACLDiff.computeDiff(MailboxACL.EMPTY, mailboxACL),
+                ACLDiff.computeDiff(MailboxACL.EMPTY, MAILBOX_ACL),
                 TestId.of(23));
-        }
 
         @Test
         void mailboxACLUpdatedShouldBeWellSerializedWithNullUser() {
-            assertThatJson(EVENT_SERIALIZER.toJson(mailboxACLUpdatedEvent))
+            assertThatJson(EVENT_SERIALIZER.toJson(UPDATED_EVENT))
                 .isEqualTo(JSON_2);
         }
 
         @Test
         void mailboxACLUpdatedShouldBeWellDeSerializedWithNullUser() {
             assertThat(EVENT_SERIALIZER.fromJson(JSON_2).get())
-                .isEqualTo(mailboxACLUpdatedEvent);
+                .isEqualTo(UPDATED_EVENT);
         }
+    }
+
+    @Nested
+    class EmptyRightInMailboxACL {
+
+        private final String jsonNullRight =
+            "{" +
+            "  \"MailboxACLUpdated\":{" +
+            "    \"mailboxPath\":{" +
+            "       \"namespace\":\"#private\"," +
+            "       \"user\":\"bob\"," +
+            "       \"name\":\"mailboxName\"" +
+            "      }," +
+            "    \"aclDiff\":{" +
+            "       \"oldACL\":{\"$any\":\"\"}," +
+            "       \"newACL\":{}}," +
+            "    \"mailboxId\":\"23\"," +
+            "    \"sessionId\":6," +
+            "    \"user\":\"user\"" +
+            "   }" +
+            "}";
+
+        private final MailboxACL mailboxACL = new MailboxACL(
+                new MailboxACL.Entry(ENTRY_KEY, new MailboxACL.Rfc4314Rights()));
+
+        private final MailboxListener.MailboxACLUpdated mailboxACLUpdated = new MailboxListener.MailboxACLUpdated(
+                MailboxSession.SessionId.of(6),
+                USER,
+                new MailboxPath(MailboxConstants.USER_NAMESPACE, "bob", "mailboxName"),
+                ACLDiff.computeDiff(mailboxACL, MailboxACL.EMPTY),
+                TestId.of(23));
+
+        @Test
+        void mailboxACLUpdatedShouldBeWellSerializedWithNullRight() {
+            String x = EVENT_SERIALIZER.toJson(mailboxACLUpdated);
+            System.out.println(x);
+            assertThatJson(EVENT_SERIALIZER.toJson(mailboxACLUpdated))
+                            .isEqualTo(jsonNullRight);
+        }
+
+        @Test
+        void mailboxACLUpdatedShouldBeWellDeSerializedWithNullUser() {
+            assertThat(EVENT_SERIALIZER.fromJson(jsonNullRight).get())
+                .isEqualTo(mailboxACLUpdated);
+        }
+
     }
 
     @Nested
@@ -165,8 +205,8 @@ class MailboxACLUpdatedEventSerializationTest {
                     "       \"name\":\"mailboxName\"" +
                     "      }," +
                     "    \"aclDiff\":{" +
-                    "       \"oldACL\":{\"entries\":{}}," +
-                    "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+                    "       \"oldACL\":{}," +
+                    "       \"newACL\":{\"$any\":\"ar\"}}," +
                     "    \"mailboxId\":\"23\"," +
                     "    \"user\":\"user\"" +
                     "   }" +
@@ -185,8 +225,8 @@ class MailboxACLUpdatedEventSerializationTest {
                     "       \"name\":\"mailboxName\"" +
                     "      }," +
                     "    \"aclDiff\":{" +
-                    "       \"oldACL\":{\"entries\":{}}," +
-                    "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+                    "       \"oldACL\":{}," +
+                    "       \"newACL\":{\"$any\":\"ar\"}}," +
                     "    \"mailboxId\":\"23\"," +
                     "    \"sessionId\":null," +
                     "    \"user\":\"user\"" +
@@ -206,8 +246,8 @@ class MailboxACLUpdatedEventSerializationTest {
                     "       \"name\":\"mailboxName\"" +
                     "      }," +
                     "    \"aclDiff\":{" +
-                    "       \"oldACL\":{\"entries\":{}}," +
-                    "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+                    "       \"oldACL\":{}," +
+                    "       \"newACL\":{\"$any\":\"ar\"}}," +
                     "    \"mailboxId\":\"23\"," +
                     "    \"sessionId\":\"123\"," +
                     "    \"user\":\"user\"" +
@@ -230,8 +270,8 @@ class MailboxACLUpdatedEventSerializationTest {
                     "       \"name\":\"mailboxName\"" +
                     "      }," +
                     "    \"aclDiff\":{" +
-                    "       \"oldACL\":{\"entries\":{}}," +
-                    "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+                    "       \"oldACL\":{}," +
+                    "       \"newACL\":{\"$any\":\"ar\"}}," +
                     "    \"mailboxId\":\"23\"," +
                     "    \"sessionId\":6" +
                     "   }" +
@@ -249,8 +289,8 @@ class MailboxACLUpdatedEventSerializationTest {
                     "       \"name\":\"mailboxName\"" +
                     "      }," +
                     "    \"aclDiff\":{" +
-                    "       \"oldACL\":{\"entries\":{}}," +
-                    "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+                    "       \"oldACL\":{}," +
+                    "       \"newACL\":{\"$any\":\"ar\"}}," +
                     "    \"mailboxId\":\"23\"," +
                     "    \"sessionId\":6," +
                     "    \"user\":12345" +
@@ -269,8 +309,8 @@ class MailboxACLUpdatedEventSerializationTest {
                     "       \"name\":\"mailboxName\"" +
                     "      }," +
                     "    \"aclDiff\":{" +
-                    "       \"oldACL\":{\"entries\":{}}," +
-                    "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+                    "       \"oldACL\":{}," +
+                    "       \"newACL\":{\"$any\":\"ar\"}}," +
                     "    \"mailboxId\":\"23\"," +
                     "    \"sessionId\":6," +
                     "    \"user\":\"user@domain@secondDomain\"" +
@@ -299,6 +339,10 @@ class MailboxACLUpdatedEventSerializationTest {
                     "}").get())
                     .isInstanceOf(NoSuchElementException.class);
             }
+        }
+
+        @Nested
+        class DeserializationErrorOnOldACL {
 
             @Test
             void mailboxACLUpdatedShouldThrowWhenMissingOldACLinACLDiff() {
@@ -310,7 +354,7 @@ class MailboxACLUpdatedEventSerializationTest {
                     "       \"name\":\"mailboxName\"" +
                     "      }," +
                     "    \"aclDiff\":{" +
-                    "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+                    "       \"newACL\":{\"$any\":\"ar\"}}," +
                     "    \"mailboxId\":\"23\"," +
                     "    \"sessionId\":6," +
                     "    \"user\":\"user\"" +
@@ -318,6 +362,187 @@ class MailboxACLUpdatedEventSerializationTest {
                     "}").get())
                     .isInstanceOf(NoSuchElementException.class);
             }
+
+            @Nested
+            class DeserializationErrorOnOldACLEntryKey {
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenNotIncludedNameInEntryKey() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                    "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{\"$\":\"ar\"}}," +
+                        "       \"newACL\":{}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(IllegalStateException.class);
+                }
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenNameInEntryKeyIsNotString() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                        "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{1234:\"ar\"}}," +
+                        "       \"newACL\":{}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(JsonParseException.class);
+                }
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenNameInEntryKeyIsEmpty() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                        "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{\"\":\"ar\"}}," +
+                        "       \"newACL\":{}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(IllegalArgumentException.class);
+                }
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenNullEntryKey() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                        "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{null:\"ar\"}}," +
+                        "       \"newACL\":{}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(JsonParseException.class);
+                }
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenEntryKeyIsNotWellFormatted() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                        "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{\"-\":\"ar\"}}," +
+                        "       \"newACL\":{}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(StringIndexOutOfBoundsException.class);
+                }
+            }
+
+            @Nested
+            class DeserializationErrorOnOldACLRight {
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenUnsupportedRightInMailboxACL() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                        "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{\"$any\":\"unsupported\"}," +
+                        "       \"newACL\":{\"$any\":\"a\"}}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(UnsupportedRightException.class);
+                }
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenNullRightInMailboxACL() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                        "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{\"$any\":null}}," +
+                        "       \"newACL\":{}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(NoSuchElementException.class);
+                }
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenRightIsNotStringInMailboxACL() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                        "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{\"$any\":1234}}," +
+                        "       \"newACL\":{}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(NoSuchElementException.class);
+                }
+
+            }
+        }
+
+        @Nested
+        class DeserializationErrorOnNewACL {
 
             @Test
             void mailboxACLUpdatedShouldThrowWhenMissingNewACLinACLDiff() {
@@ -329,7 +554,7 @@ class MailboxACLUpdatedEventSerializationTest {
                     "       \"name\":\"mailboxName\"" +
                     "      }," +
                     "    \"aclDiff\":{" +
-                    "       \"oldACL\":{\"entries\":{}}}," +
+                    "       \"oldACL\":{}}," +
                     "    \"mailboxId\":\"23\"," +
                     "    \"sessionId\":6," +
                     "    \"user\":\"user\"" +
@@ -337,74 +562,184 @@ class MailboxACLUpdatedEventSerializationTest {
                     "}").get())
                     .isInstanceOf(NoSuchElementException.class);
             }
+
+            @Nested
+            class DeserializationErrorOnNewACLEntryKey {
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenNotIncludedNameInEntryKey() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                    "{" +
+                    "  \"MailboxACLUpdated\":{" +
+                    "    \"mailboxPath\":{" +
+                    "       \"namespace\":\"#private\"," +
+                    "       \"user\":\"bob\"," +
+                    "       \"name\":\"mailboxName\"" +
+                    "      }," +
+                    "    \"aclDiff\":{" +
+                    "       \"oldACL\":{}," +
+                    "       \"newACL\":{\"$\":\"ar\"}}," +
+                    "    \"mailboxId\":\"23\"," +
+                    "    \"sessionId\":6," +
+                    "    \"user\":\"user\"" +
+                    "   }" +
+                    "}").get())
+                        .isInstanceOf(IllegalStateException.class);
+                }
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenNameInEntryKeyIsNotString() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                        "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{}," +
+                        "       \"newACL\":{1234:\"ar\"}}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(JsonParseException.class);
+                }
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenNameInEntryKeyIsEmpty() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                        "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{}," +
+                        "       \"newACL\":{\"\":\"ar\"}}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(IllegalArgumentException.class);
+                }
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenNullEntryKey() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                        "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{}," +
+                        "       \"newACL\":{null:\"ar\"}}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(JsonParseException.class);
+                }
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenEntryKeyIsNotWellFormatted() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                        "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{}," +
+                        "       \"newACL\":{\"-\":\"ar\"}}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(StringIndexOutOfBoundsException.class);
+                }
+            }
+
+            @Nested
+            class DeserializationErrorOnNewACLRight {
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenUnsupportedRightInNewACL() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                        "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{\"$any\":\"a\"}," +
+                        "       \"newACL\":{\"$any\":\"unsupported\"}}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(UnsupportedRightException.class);
+                }
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenNullRightInMailboxACL() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                        "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{}," +
+                        "       \"newACL\":{\"$any\":null}}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(NoSuchElementException.class);
+                }
+
+                @Test
+                void mailboxACLUpdatedShouldThrowWhenRightIsNotString() {
+                    assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
+                        "{" +
+                        "  \"MailboxACLUpdated\":{" +
+                        "    \"mailboxPath\":{" +
+                        "       \"namespace\":\"#private\"," +
+                        "       \"user\":\"bob\"," +
+                        "       \"name\":\"mailboxName\"" +
+                        "      }," +
+                        "    \"aclDiff\":{" +
+                        "       \"oldACL\":{}," +
+                        "       \"newACL\":{\"$any\":1234}}," +
+                        "    \"mailboxId\":\"23\"," +
+                        "    \"sessionId\":6," +
+                        "    \"user\":\"user\"" +
+                        "   }" +
+                        "}").get())
+                        .isInstanceOf(NoSuchElementException.class);
+                }
+            }
         }
-
-        @Nested
-        class DeserializationErrorOnEntriesOfACLDiff {
-
-            @Test
-            void mailboxACLUpdatedShouldThrowWhenUnsupportedRightInMailboxACL() {
-                assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
-                    "{" +
-                    "  \"MailboxACLUpdated\":{" +
-                    "    \"mailboxPath\":{" +
-                    "       \"namespace\":\"#private\"," +
-                    "       \"user\":\"bob\"," +
-                    "       \"name\":\"mailboxName\"" +
-                    "      }," +
-                    "    \"aclDiff\":{" +
-                    "       \"oldACL\":{\"entries\":{}}," +
-                    "       \"newACL\":{\"entries\":{\"$any\":\"b\"}}}," +
-                    "    \"mailboxId\":\"23\"," +
-                    "    \"sessionId\":6," +
-                    "    \"user\":\"user\"" +
-                    "   }" +
-                    "}").get())
-                    .isInstanceOf(UnsupportedRightException.class);
-            }
-
-            @Test
-            void mailboxACLUpdatedShouldThrowWhenEmptyRightInMailboxACL() {
-                assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
-                    "{" +
-                    "  \"MailboxACLUpdated\":{" +
-                    "    \"mailboxPath\":{" +
-                    "       \"namespace\":\"#private\"," +
-                    "       \"user\":\"bob\"," +
-                    "       \"name\":\"mailboxName\"" +
-                    "      }," +
-                    "    \"aclDiff\":{" +
-                    "       \"oldACL\":{\"entries\":{}}," +
-                    "       \"newACL\":{\"entries\":{\"$any\":\" \"}}}," +
-                    "    \"mailboxId\":\"23\"," +
-                    "    \"sessionId\":6," +
-                    "    \"user\":\"user\"" +
-                    "   }" +
-                    "}").get())
-                    .isInstanceOf(UnsupportedRightException.class);
-            }
-
-            @Test
-            void mailboxACLUpdatedShouldThrowWhenNullNameInEntryKeyInMailboxACL() {
-                assertThatThrownBy(() -> EVENT_SERIALIZER.fromJson(
-                    "{" +
-                    "  \"MailboxACLUpdated\":{" +
-                    "    \"mailboxPath\":{" +
-                    "       \"namespace\":\"#private\"," +
-                    "       \"user\":\"bob\"," +
-                    "       \"name\":\"mailboxName\"" +
-                    "      }," +
-                    "    \"aclDiff\":{" +
-                    "       \"oldACL\":{\"entries\":{}}," +
-                    "       \"newACL\":{\"entries\":{\"$\":\"ar\"}}}," +
-                    "    \"mailboxId\":\"23\"," +
-                    "    \"sessionId\":6," +
-                    "    \"user\":\"user\"" +
-                    "   }" +
-                    "}").get())
-                    .isInstanceOf(IllegalStateException.class);
-            }
-        }
+    }
 
         @Nested
         class DeserializationErrorOnMailboxId {
@@ -419,8 +754,8 @@ class MailboxACLUpdatedEventSerializationTest {
                     "       \"name\":\"mailboxName\"" +
                     "      }," +
                     "    \"aclDiff\":{" +
-                    "       \"oldACL\":{\"entries\":{}}," +
-                    "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+                    "       \"oldACL\":{}," +
+                    "       \"newACL\":{\"$any\":\"ar\"}}," +
                     "    \"sessionId\":6," +
                     "    \"user\":\"user\"" +
                     "   }" +
@@ -439,8 +774,8 @@ class MailboxACLUpdatedEventSerializationTest {
                     "       \"name\":\"mailboxName\"" +
                     "      }," +
                     "    \"aclDiff\":{" +
-                    "       \"oldACL\":{\"entries\":{}}," +
-                    "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+                    "       \"oldACL\":{}," +
+                    "       \"newACL\":{\"$any\":\"ar\"}}," +
                     "    \"mailboxId\":null," +
                     "    \"sessionId\":6," +
                     "    \"user\":\"user\"" +
@@ -460,8 +795,8 @@ class MailboxACLUpdatedEventSerializationTest {
                     "       \"name\":\"mailboxName\"" +
                     "      }," +
                     "    \"aclDiff\":{" +
-                    "       \"oldACL\":{\"entries\":{}}," +
-                    "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+                    "       \"oldACL\":{}," +
+                    "       \"newACL\":{\"$any\":\"ar\"}}," +
                     "    \"mailboxId\":123," +
                     "    \"sessionId\":6," +
                     "    \"user\":\"user\"" +
@@ -487,8 +822,8 @@ class MailboxACLUpdatedEventSerializationTest {
                         "       \"name\":\"mailboxName\"" +
                         "      }," +
                         "    \"aclDiff\":{" +
-                        "       \"oldACL\":{\"entries\":{}}," +
-                        "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+                        "       \"oldACL\":{}," +
+                        "       \"newACL\":{\"$any\":\"ar\"}}," +
                         "    \"mailboxId\":\"123\"," +
                         "    \"sessionId\":6," +
                         "    \"user\":\"user\"" +
@@ -511,8 +846,8 @@ class MailboxACLUpdatedEventSerializationTest {
                         "       \"name\":\"mailboxName\"" +
                         "      }," +
                         "    \"aclDiff\":{" +
-                        "       \"oldACL\":{\"entries\":{}}," +
-                        "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+                        "       \"oldACL\":{}," +
+                        "       \"newACL\":{\"$any\":\"ar\"}}," +
                         "    \"mailboxId\":\"123\"," +
                         "    \"sessionId\":6," +
                         "    \"user\":\"user\"" +
@@ -536,8 +871,8 @@ class MailboxACLUpdatedEventSerializationTest {
                         "       \"name\":null" +
                         "      }," +
                         "    \"aclDiff\":{" +
-                        "       \"oldACL\":{\"entries\":{}}," +
-                        "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+                        "       \"oldACL\":{}," +
+                        "       \"newACL\":{\"$any\":\"ar\"}}," +
                         "    \"mailboxId\":\"123\"," +
                         "    \"sessionId\":6," +
                         "    \"user\":\"user\"" +
@@ -557,8 +892,8 @@ class MailboxACLUpdatedEventSerializationTest {
                         "       \"name\":160205" +
                         "      }," +
                         "    \"aclDiff\":{" +
-                        "       \"oldACL\":{\"entries\":{}}," +
-                        "       \"newACL\":{\"entries\":{\"$any\":\"ar\"}}}," +
+                        "       \"oldACL\":{}," +
+                        "       \"newACL\":{\"$any\":\"ar\"}}," +
                         "    \"mailboxId\":\"123\"," +
                         "    \"sessionId\":6," +
                         "    \"user\":\"user\"" +
@@ -568,5 +903,5 @@ class MailboxACLUpdatedEventSerializationTest {
                 }
             }
         }
-    }
+
 }
