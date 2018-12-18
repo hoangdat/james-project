@@ -114,6 +114,61 @@ class MailboxACLUpdatedEventSerializationTest {
     }
 
     @Nested
+    class NullNameSpaceInMailboxPath {
+
+        private final MailboxACL MAILBOX_ACL = new MailboxACL(
+            new MailboxACL.Entry(ENTRY_KEY, RIGHTS));
+
+        private final MailboxListener.MailboxACLUpdated UPDATED_EVENT = new MailboxListener.MailboxACLUpdated(
+            MailboxSession.SessionId.of(6),
+            USER,
+            new MailboxPath(MailboxConstants.USER_NAMESPACE, "bob", "mailboxName"),
+            ACLDiff.computeDiff(MailboxACL.EMPTY, MAILBOX_ACL),
+            TestId.of(23));
+
+        @Test
+        void mailboxAddedShouldBeWellDeSerializedWhenMissingNameSpace() {
+            assertThat(EVENT_SERIALIZER.fromJson(
+                "{" +
+                "  \"MailboxACLUpdated\":{" +
+                "    \"mailboxPath\":{" +
+                "       \"user\": \"bob\"," +
+                "       \"name\":\"mailboxName\"" +
+                "      }," +
+                "    \"aclDiff\":{" +
+                "       \"oldACL\":{}," +
+                "       \"newACL\":{\"$any\":\"ar\"}}," +
+                "    \"mailboxId\":\"23\"," +
+                "    \"sessionId\":6," +
+                "    \"user\":\"user\"" +
+                "   }" +
+                "}").get())
+                .isEqualTo(UPDATED_EVENT);
+        }
+
+        @Test
+        void mailboxAddedShouldBeWellDeSerializedWhenNullNameSpace() {
+            assertThat(EVENT_SERIALIZER.fromJson(
+                "{" +
+                "  \"MailboxACLUpdated\":{" +
+                "    \"mailboxPath\":{" +
+                "       \"namespace\":null," +
+                "       \"user\": \"bob\"," +
+                "       \"name\":\"mailboxName\"" +
+                "      }," +
+                "    \"aclDiff\":{" +
+                "       \"oldACL\":{}," +
+                "       \"newACL\":{\"$any\":\"ar\"}}," +
+                "    \"mailboxId\":\"23\"," +
+                "    \"sessionId\":6," +
+                "    \"user\":\"user\"" +
+                "   }" +
+                "}").get())
+                .isEqualTo(UPDATED_EVENT);
+        }
+    }
+
+    @Nested
     class EmptyRightInMailboxACL {
 
         private final String jsonNullRight =

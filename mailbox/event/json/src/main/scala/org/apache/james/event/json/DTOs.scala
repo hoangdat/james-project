@@ -36,7 +36,7 @@ object DTOs {
 
   object MailboxPath {
     def fromJava(javaMailboxPath: JavaMailboxPath): MailboxPath = MailboxPath(
-      javaMailboxPath.getNamespace,
+      Option(javaMailboxPath.getNamespace),
       Option(javaMailboxPath.getUser),
       javaMailboxPath.getName)
   }
@@ -46,8 +46,8 @@ object DTOs {
     def toJava: JavaACLDiff = new JavaACLDiff(new JavaMailboxACL(oldACL.asJava), new JavaMailboxACL(newACL.asJava))
   }
 
-  case class MailboxPath(namespace: String, user: Option[String], name: String) {
-    def toJava: JavaMailboxPath = new JavaMailboxPath(namespace, user.orNull, name)
+  case class MailboxPath(namespace: Option[String], user: Option[String], name: String) {
+    def toJava: JavaMailboxPath = new JavaMailboxPath(namespace.orNull, user.orNull, name)
   }
 
   case class Quota[T <: QuotaValue[T]](used: T, limit: T, limits: Map[JavaQuota.Scope, T]) {
