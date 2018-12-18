@@ -110,18 +110,18 @@ private object ScalaConverter {
 }
 
 private class JsonSerialize(mailboxIdFactory: MailboxId.Factory) {
-  implicit val aclDiffWrites: Writes[ACLDiff] = Json.writes[ACLDiff]
+  implicit val userWriters: Writes[User] = (user: User) => JsString(user.asString)
+  implicit val quotaRootWrites: Writes[QuotaRoot] = quotaRoot => JsString(quotaRoot.getValue)
+  implicit val quotaValueWrites: Writes[QuotaValue[_]] = value => if (value.isUnlimited) JsNull else JsNumber(value.asLong())
+  implicit val quotaScopeWrites: Writes[JavaQuota.Scope] = value => JsString(value.name)
+  implicit val quotaCountWrites: Writes[Quota[QuotaCount]] = Json.writes[Quota[QuotaCount]]
+  implicit val quotaSizeWrites: Writes[Quota[QuotaSize]] = Json.writes[Quota[QuotaSize]]
+  implicit val mailboxPathWrites: Writes[MailboxPath] = Json.writes[MailboxPath]
+  implicit val mailboxIdWrites: Writes[MailboxId] = value => JsString(value.serialize())
+  implicit val sessionIdWrites: Writes[SessionId] = value => JsNumber(value.getValue)
   implicit val aclEntryKeyWrites: Writes[JavaMailboxACL.EntryKey] = value => JsString(value.serialize())
   implicit val aclRightsWrites: Writes[JavaMailboxACL.Rfc4314Rights] = value => JsString(value.serialize())
-  implicit val mailboxIdWrites: Writes[MailboxId] = value => JsString(value.serialize())
-  implicit val mailboxPathWrites: Writes[MailboxPath] = Json.writes[MailboxPath]
-  implicit val quotaCountWrites: Writes[Quota[QuotaCount]] = Json.writes[Quota[QuotaCount]]
-  implicit val quotaRootWrites: Writes[QuotaRoot] = quotaRoot => JsString(quotaRoot.getValue)
-  implicit val quotaScopeWrites: Writes[JavaQuota.Scope] = value => JsString(value.name)
-  implicit val quotaSizeWrites: Writes[Quota[QuotaSize]] = Json.writes[Quota[QuotaSize]]
-  implicit val quotaValueWrites: Writes[QuotaValue[_]] = value => if (value.isUnlimited) JsNull else JsNumber(value.asLong())
-  implicit val sessionIdWrites: Writes[SessionId] = value => JsNumber(value.getValue)
-  implicit val userWriters: Writes[User] = (user: User) => JsString(user.asString)
+  implicit val aclDiffWrites: Writes[ACLDiff] = Json.writes[ACLDiff]
 
   implicit val aclEntryKeyReads: Reads[JavaMailboxACL.EntryKey] = {
     case JsString(keyAsString) => JsSuccess(JavaMailboxACL.EntryKey.deserialize(keyAsString))
