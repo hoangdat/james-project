@@ -37,18 +37,12 @@ private sealed trait Event {
 }
 
 private object DTO {
-
-  case class QuotaUsageUpdatedEvent(user: User, quotaRoot: QuotaRoot, countQuota: Quota[QuotaCount],
-                                    sizeQuota: Quota[QuotaSize], time: Instant) extends Event {
-    override def toJava: JavaEvent = new JavaQuotaUsageUpdatedEvent(user, quotaRoot, countQuota.toJava, sizeQuota.toJava, time)
+  case class MailboxACLUpdated(sessionId: SessionId, user: User, mailboxPath: MailboxPath, aclDiff: ACLDiff, mailboxId: MailboxId) extends Event {
+    override def toJava: JavaEvent = new JavaMailboxACLUpdated(sessionId, user, mailboxPath.toJava, aclDiff.toJava, mailboxId)
   }
 
   case class MailboxAdded(mailboxPath: MailboxPath, mailboxId: MailboxId, user: User, sessionId: SessionId) extends Event {
     override def toJava: JavaEvent = new JavaMailboxAdded(sessionId, user, mailboxPath.toJava, mailboxId)
-  }
-
-  case class MailboxRenamed(sessionId: SessionId, user: User, path: MailboxPath, mailboxId: MailboxId, newPath: MailboxPath) extends Event {
-    override def toJava: JavaEvent = new JavaMailboxRenamed(sessionId, user, path.toJava, mailboxId, newPath.toJava)
   }
 
   case class MailboxDeletion(sessionId: SessionId, user: User, path: MailboxPath, quotaRoot: QuotaRoot,
@@ -58,31 +52,29 @@ private object DTO {
       mailboxId)
   }
 
-  case class MailboxACLUpdated(sessionId: SessionId, user: User, mailboxPath: MailboxPath, aclDiff: ACLDiff, mailboxId: MailboxId) extends Event {
-    override def toJava: JavaEvent = new JavaMailboxACLUpdated(sessionId, user, mailboxPath.toJava, aclDiff.toJava, mailboxId)
+  case class MailboxRenamed(sessionId: SessionId, user: User, path: MailboxPath, mailboxId: MailboxId, newPath: MailboxPath) extends Event {
+    override def toJava: JavaEvent = new JavaMailboxRenamed(sessionId, user, path.toJava, mailboxId, newPath.toJava)
+  }
+
+  case class QuotaUsageUpdatedEvent(user: User, quotaRoot: QuotaRoot, countQuota: Quota[QuotaCount],
+                                    sizeQuota: Quota[QuotaSize], time: Instant) extends Event {
+    override def toJava: JavaEvent = new JavaQuotaUsageUpdatedEvent(user, quotaRoot, countQuota.toJava, sizeQuota.toJava, time)
   }
 }
 
 private object ScalaConverter {
-  private def toScala(event: JavaQuotaUsageUpdatedEvent): DTO.QuotaUsageUpdatedEvent = DTO.QuotaUsageUpdatedEvent(
+  private def toScala(event: JavaMailboxACLUpdated): DTO.MailboxACLUpdated = DTO.MailboxACLUpdated(
+    sessionId = event.getSessionId,
     user = event.getUser,
-    quotaRoot = event.getQuotaRoot,
-    countQuota = Quota.toScala(event.getCountQuota),
-    sizeQuota = Quota.toScala(event.getSizeQuota),
-    time = event.getInstant)
+    mailboxPath = MailboxPath.fromJava(event.getMailboxPath),
+    aclDiff = ACLDiff.fromJava(event.getAclDiff),
+    mailboxId = event.getMailboxId)
 
   private def toScala(event: JavaMailboxAdded): DTO.MailboxAdded = DTO.MailboxAdded(
     mailboxPath = MailboxPath.fromJava(event.getMailboxPath),
     mailboxId = event.getMailboxId,
     user = event.getUser,
     sessionId = event.getSessionId)
-
-  private def toScala(event: JavaMailboxRenamed): DTO.MailboxRenamed = DTO.MailboxRenamed(
-    sessionId = event.getSessionId,
-    user = event.getUser,
-    path = MailboxPath.fromJava(event.getMailboxPath),
-    mailboxId = event.getMailboxId,
-    newPath = MailboxPath.fromJava(event.getNewPath))
 
   private def toScala(event: JavaMailboxDeletion): DTO.MailboxDeletion = DTO.MailboxDeletion(
     sessionId = event.getSessionId,
@@ -93,36 +85,43 @@ private object ScalaConverter {
     totalDeletedSize = event.getTotalDeletedSize,
     mailboxId = event.getMailboxId)
 
-  private def toScala(event: JavaMailboxACLUpdated): DTO.MailboxACLUpdated = DTO.MailboxACLUpdated(
+  private def toScala(event: JavaMailboxRenamed): DTO.MailboxRenamed = DTO.MailboxRenamed(
     sessionId = event.getSessionId,
     user = event.getUser,
-    mailboxPath = MailboxPath.fromJava(event.getMailboxPath),
-    aclDiff = ACLDiff.fromJava(event.getAclDiff),
-    mailboxId = event.getMailboxId)
+    path = MailboxPath.fromJava(event.getMailboxPath),
+    mailboxId = event.getMailboxId,
+    newPath = MailboxPath.fromJava(event.getNewPath))
+
+  private def toScala(event: JavaQuotaUsageUpdatedEvent): DTO.QuotaUsageUpdatedEvent = DTO.QuotaUsageUpdatedEvent(
+    user = event.getUser,
+    quotaRoot = event.getQuotaRoot,
+    countQuota = Quota.toScala(event.getCountQuota),
+    sizeQuota = Quota.toScala(event.getSizeQuota),
+    time = event.getInstant)
 
   def toScala(javaEvent: JavaEvent): Event = javaEvent match {
-    case e: JavaQuotaUsageUpdatedEvent => toScala(e)
-    case e: JavaMailboxAdded => toScala(e)
-    case e: JavaMailboxRenamed => toScala(e)
-    case e: JavaMailboxDeletion => toScala(e)
     case e: JavaMailboxACLUpdated => toScala(e)
+    case e: JavaMailboxAdded => toScala(e)
+    case e: JavaMailboxDeletion => toScala(e)
+    case e: JavaMailboxRenamed => toScala(e)
+    case e: JavaQuotaUsageUpdatedEvent => toScala(e)
     case _ => throw new RuntimeException("no Scala convertion known")
   }
 }
 
 private class JsonSerialize(mailboxIdFactory: MailboxId.Factory) {
-  implicit val userWriters: Writes[User] = (user: User) => JsString(user.asString)
-  implicit val quotaRootWrites: Writes[QuotaRoot] = quotaRoot => JsString(quotaRoot.getValue)
-  implicit val quotaValueWrites: Writes[QuotaValue[_]] = value => if (value.isUnlimited) JsNull else JsNumber(value.asLong())
-  implicit val quotaScopeWrites: Writes[JavaQuota.Scope] = value => JsString(value.name)
-  implicit val quotaCountWrites: Writes[Quota[QuotaCount]] = Json.writes[Quota[QuotaCount]]
-  implicit val quotaSizeWrites: Writes[Quota[QuotaSize]] = Json.writes[Quota[QuotaSize]]
-  implicit val mailboxPathWrites: Writes[MailboxPath] = Json.writes[MailboxPath]
-  implicit val mailboxIdWrites: Writes[MailboxId] = value => JsString(value.serialize())
-  implicit val sessionIdWrites: Writes[SessionId] = value => JsNumber(value.getValue)
+  implicit val aclDiffWrites: Writes[ACLDiff] = Json.writes[ACLDiff]
   implicit val aclEntryKeyWrites: Writes[JavaMailboxACL.EntryKey] = value => JsString(value.serialize())
   implicit val aclRightsWrites: Writes[JavaMailboxACL.Rfc4314Rights] = value => JsString(value.serialize())
-  implicit val aclDiffWrites: Writes[ACLDiff] = Json.writes[ACLDiff]
+  implicit val mailboxIdWrites: Writes[MailboxId] = value => JsString(value.serialize())
+  implicit val mailboxPathWrites: Writes[MailboxPath] = Json.writes[MailboxPath]
+  implicit val quotaCountWrites: Writes[Quota[QuotaCount]] = Json.writes[Quota[QuotaCount]]
+  implicit val quotaRootWrites: Writes[QuotaRoot] = quotaRoot => JsString(quotaRoot.getValue)
+  implicit val quotaScopeWrites: Writes[JavaQuota.Scope] = value => JsString(value.name)
+  implicit val quotaSizeWrites: Writes[Quota[QuotaSize]] = Json.writes[Quota[QuotaSize]]
+  implicit val quotaValueWrites: Writes[QuotaValue[_]] = value => if (value.isUnlimited) JsNull else JsNumber(value.asLong())
+  implicit val sessionIdWrites: Writes[SessionId] = value => JsNumber(value.getValue)
+  implicit val userWriters: Writes[User] = (user: User) => JsString(user.asString)
 
   implicit val aclEntryKeyReads: Reads[JavaMailboxACL.EntryKey] = {
     case JsString(keyAsString) => JsSuccess(JavaMailboxACL.EntryKey.deserialize(keyAsString))
@@ -132,20 +131,8 @@ private class JsonSerialize(mailboxIdFactory: MailboxId.Factory) {
     case JsString(rightsAsString) => JsSuccess(JavaMailboxACL.Rfc4314Rights.deserialize(rightsAsString))
     case _ => JsError()
   }
-  implicit val userReads: Reads[User] = {
-    case JsString(userAsString) => JsSuccess(User.fromUsername(userAsString))
-    case _ => JsError()
-  }
   implicit val mailboxIdReads: Reads[MailboxId] = {
     case JsString(serializedMailboxId) => JsSuccess(mailboxIdFactory.fromString(serializedMailboxId))
-    case _ => JsError()
-  }
-  implicit val sessionIdReads: Reads[SessionId] = {
-    case JsNumber(id) => JsSuccess(SessionId.of(id.longValue()))
-    case _ => JsError()
-  }
-  implicit val quotaRootReads: Reads[QuotaRoot] = {
-    case JsString(quotaRoot) => JsSuccess(QuotaRoot.quotaRoot(quotaRoot, Optional.empty[Domain]))
     case _ => JsError()
   }
   implicit val quotaCountReads: Reads[QuotaCount] = {
@@ -153,13 +140,25 @@ private class JsonSerialize(mailboxIdFactory: MailboxId.Factory) {
     case JsNull => JsSuccess(QuotaCount.unlimited())
     case _ => JsError()
   }
+  implicit val quotaRootReads: Reads[QuotaRoot] = {
+    case JsString(quotaRoot) => JsSuccess(QuotaRoot.quotaRoot(quotaRoot, Optional.empty[Domain]))
+    case _ => JsError()
+  }
+  implicit val quotaScopeReads: Reads[JavaQuota.Scope] = {
+    case JsString(value) => JsSuccess(JavaQuota.Scope.valueOf(value))
+    case _ => JsError()
+  }
   implicit val quotaSizeReads: Reads[QuotaSize] = {
     case JsNumber(size) => JsSuccess(QuotaSize.size(size.toLong))
     case JsNull => JsSuccess(QuotaSize.unlimited())
     case _ => JsError()
   }
-  implicit val quotaScopeReads: Reads[JavaQuota.Scope] = {
-    case JsString(value) => JsSuccess(JavaQuota.Scope.valueOf(value))
+  implicit val sessionIdReads: Reads[SessionId] = {
+    case JsNumber(id) => JsSuccess(SessionId.of(id.longValue()))
+    case _ => JsError()
+  }
+  implicit val userReads: Reads[User] = {
+    case JsString(userAsString) => JsSuccess(User.fromUsername(userAsString))
     case _ => JsError()
   }
 
@@ -183,10 +182,10 @@ private class JsonSerialize(mailboxIdFactory: MailboxId.Factory) {
       JsObject(m.map { case (k, v) => (k.toString, vr.writes(v)) }.toSeq)
     }
 
+  implicit val aclDiffReads: Reads[ACLDiff] = Json.reads[ACLDiff]
+  implicit val mailboxPathReads: Reads[MailboxPath] = Json.reads[MailboxPath]
   implicit val quotaCReads: Reads[Quota[QuotaCount]] = Json.reads[Quota[QuotaCount]]
   implicit val quotaSReads: Reads[Quota[QuotaSize]] = Json.reads[Quota[QuotaSize]]
-  implicit val mailboxPathReads: Reads[MailboxPath] = Json.reads[MailboxPath]
-  implicit val aclDiffReads: Reads[ACLDiff] = Json.reads[ACLDiff]
 
   implicit val eventOFormat: OFormat[Event] = derived.oformat()
 
