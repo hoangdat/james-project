@@ -19,13 +19,36 @@
 
 package org.apache.james.mailbox.events;
 
-public interface RegistrationKey {
+import static org.apache.james.mailbox.events.RabbitMQEventBus.MAILBOX_EVENT_EXCHANGE_NAME;
 
-    interface Factory {
-        Class<? extends RegistrationKey> forClass();
+import reactor.core.publisher.Mono;
+import reactor.rabbitmq.BindingSpecification;
+import reactor.rabbitmq.Sender;
 
-        RegistrationKey fromString(String asString);
+class RegistrationBinder {
+    private final Sender sender;
+    private final RegistrationQueueName registrationQueue;
+
+    RegistrationBinder(Sender sender, RegistrationQueueName registrationQueue) {
+        this.sender = sender;
+        this.registrationQueue = registrationQueue;
     }
 
-    String asString();
+    Mono<Void> bind(RegistrationKey key) {
+        return sender.bind(bindingSpecification(key))
+            .then();
+    }
+
+    Mono<Void> unbind(RegistrationKey key) {
+        return sender.bind(bindingSpecification(key))
+            .then();
+    }
+
+    private BindingSpecification bindingSpecification(RegistrationKey key) {
+        String routingKey = RoutingKeyConverter.toRoutingKey(key);
+        return BindingSpecification.binding()
+            .exchange(MAILBOX_EVENT_EXCHANGE_NAME)
+            .queue(registrationQueue.asString())
+            .routingKey(routingKey);
+    }
 }

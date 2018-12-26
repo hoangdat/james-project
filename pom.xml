@@ -673,6 +673,11 @@
                 <scope>import</scope>
             </dependency>
             <dependency>
+                <groupId>io.projectreactor.rabbitmq</groupId>
+                <artifactId>reactor-rabbitmq</artifactId>
+                <version>1.0.0.RELEASE</version>
+            </dependency>
+            <dependency>
                 <groupId>${james.groupId}</groupId>
                 <artifactId>apache-james-backends-cassandra</artifactId>
                 <version>${project.version}</version>
@@ -759,6 +764,11 @@
                 <artifactId>apache-james-mailbox-elasticsearch</artifactId>
                 <version>${project.version}</version>
                 <type>test-jar</type>
+            </dependency>
+            <dependency>
+                <groupId>${james.groupId}</groupId>
+                <artifactId>apache-james-mailbox-event-json</artifactId>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>${james.groupId}</groupId>

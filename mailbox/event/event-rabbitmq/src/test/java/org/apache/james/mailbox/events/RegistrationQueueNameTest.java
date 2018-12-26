@@ -22,35 +22,43 @@ package org.apache.james.mailbox.events;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import org.apache.james.mailbox.model.TestId;
 import org.junit.jupiter.api.Test;
 
-import nl.jqno.equalsverifier.EqualsVerifier;
-
-class MailboxIdRegistrationKeyTest {
-    private static final MailboxIdRegistrationKey.Factory FACTORY = new MailboxIdRegistrationKey.Factory(new TestId.Factory());
+class RegistrationQueueNameTest {
+    private static final String NAME = "name";
 
     @Test
-    void shouldRespectBeanContract() {
-        EqualsVerifier.forClass(MailboxIdRegistrationKey.class)
-            .verify();
+    void asStringShouldThrowWhenNotInitialized() {
+        RegistrationQueueName registrationQueueName = new RegistrationQueueName();
+
+        assertThatThrownBy(registrationQueueName::asString)
+            .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
-    void asStringShouldReturnSerializedMailboxId() {
-        assertThat(new MailboxIdRegistrationKey(TestId.of(42)).asString())
-            .isEqualTo("42");
+    void doubleInitializationShouldBeRejected() {
+        RegistrationQueueName registrationQueueName = new RegistrationQueueName();
+        registrationQueueName.initialize(NAME);
+
+        assertThatThrownBy(() -> registrationQueueName.initialize(NAME))
+            .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
-    void fromStringShouldReturnCorrespondingRegistrationKey() {
-        assertThat(FACTORY.fromString("42"))
-            .isEqualTo(new MailboxIdRegistrationKey(TestId.of(42)));
+    void nullInitializationShouldBeRejected() {
+        RegistrationQueueName registrationQueueName = new RegistrationQueueName();
+        registrationQueueName.initialize(NAME);
+
+        assertThatThrownBy(() -> registrationQueueName.initialize(null))
+            .isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    void fromStringShouldThrowOnInvalidValues() {
-        assertThatThrownBy(() -> FACTORY.fromString("invalid"))
-            .isInstanceOf(IllegalArgumentException.class);
+    void asStringShouldReturnInitializedValue() {
+        RegistrationQueueName registrationQueueName = new RegistrationQueueName();
+        registrationQueueName.initialize(NAME);
+
+        assertThat(registrationQueueName.asString())
+            .isEqualTo(NAME);
     }
 }

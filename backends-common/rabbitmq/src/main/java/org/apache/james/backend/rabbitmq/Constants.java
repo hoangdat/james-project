@@ -17,15 +17,22 @@
  * under the License.                                           *
  ****************************************************************/
 
-package org.apache.james.mailbox.events;
+package org.apache.james.backend.rabbitmq;
 
-public interface RegistrationKey {
+import com.google.common.collect.ImmutableMap;
 
-    interface Factory {
-        Class<? extends RegistrationKey> forClass();
+public interface Constants {
+    boolean DURABLE = true;
+    boolean AUTO_DELETE = true;
+    boolean EXCLUSIVE = true;
 
-        RegistrationKey fromString(String asString);
-    }
+    boolean AUTO_ACK = true;
+    boolean MULTIPLE = true;
 
-    String asString();
+    String EMPTY_ROUTING_KEY = "";
+    boolean REQUEUE = true;
+
+    String DIRECT_EXCHANGE = "direct";
+
+    ImmutableMap<String, Object> NO_ARGUMENTS = ImmutableMap.of();
 }

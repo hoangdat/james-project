@@ -19,13 +19,25 @@
 
 package org.apache.james.mailbox.events;
 
-public interface RegistrationKey {
+import java.util.Optional;
 
-    interface Factory {
-        Class<? extends RegistrationKey> forClass();
+import com.google.common.base.Preconditions;
 
-        RegistrationKey fromString(String asString);
+class RegistrationQueueName {
+    private Optional<String> queueName;
+
+    RegistrationQueueName() {
+        this.queueName = Optional.empty();
     }
 
-    String asString();
+    void initialize(String queueName) {
+        Preconditions.checkNotNull(queueName);
+        Preconditions.checkState(!this.queueName.isPresent(), "");
+        this.queueName = Optional.of(queueName);
+    }
+
+    String asString() {
+        Preconditions.checkState(queueName.isPresent(), "'queueName' is not yet initialized");
+        return queueName.get();
+    }
 }

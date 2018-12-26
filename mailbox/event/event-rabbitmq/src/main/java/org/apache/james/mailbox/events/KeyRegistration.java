@@ -19,13 +19,15 @@
 
 package org.apache.james.mailbox.events;
 
-public interface RegistrationKey {
+class KeyRegistration implements Registration {
+    private final Runnable unregister;
 
-    interface Factory {
-        Class<? extends RegistrationKey> forClass();
-
-        RegistrationKey fromString(String asString);
+    KeyRegistration(Runnable unregister) {
+        this.unregister = unregister;
     }
 
-    String asString();
+    @Override
+    public void unregister() {
+        unregister.run();
+    }
 }
