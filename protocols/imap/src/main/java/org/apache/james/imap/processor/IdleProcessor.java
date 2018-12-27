@@ -197,6 +197,11 @@ public class IdleProcessor extends AbstractMailboxProcessor<IdleRequest> impleme
         public ListenerType getType() {
             return ListenerType.MAILBOX;
         }
+
+        @Override
+        public ExecutionMode getExecutionMode() {
+            return ExecutionMode.ASYNCHRONOUS;
+        }
     }
 
     @Override
