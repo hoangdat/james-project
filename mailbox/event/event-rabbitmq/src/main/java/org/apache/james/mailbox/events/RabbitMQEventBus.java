@@ -39,6 +39,7 @@ class RabbitMQEventBus implements EventBus {
     static final String MAILBOX_EVENT = "mailboxEvent";
     static final String MAILBOX_EVENT_EXCHANGE_NAME = MAILBOX_EVENT + "-exchange";
     static final String EMPTY_ROUTING_KEY = "";
+    static final String EVENT_BUS_ID = "eventBusId";
 
     private static final boolean DURABLE = true;
     private static final String DIRECT_EXCHANGE = "direct";
@@ -47,13 +48,17 @@ class RabbitMQEventBus implements EventBus {
     private final GroupRegistrationHandler groupRegistrationHandler;
     private final KeyRegistrationHandler keyRegistrationHandler;
     private final EventDispatcher eventDispatcher;
+    private final EventBusId eventBusId;
+    private final MailboxListenerRegistry mailboxListenerRegistry;
 
     RabbitMQEventBus(RabbitMQConnectionFactory rabbitMQConnectionFactory, EventSerializer eventSerializer, RoutingKeyConverter routingKeyConverter) {
+        this.eventBusId = EventBusId.random();
+        this.mailboxListenerRegistry = new MailboxListenerRegistry();
         Mono<Connection> connectionMono = Mono.fromSupplier(rabbitMQConnectionFactory::create).cache();
         this.sender = RabbitFlux.createSender(new SenderOptions().connectionMono(connectionMono));
         this.groupRegistrationHandler = new GroupRegistrationHandler(eventSerializer, sender, connectionMono);
-        this.eventDispatcher = new EventDispatcher(eventSerializer, sender);
-        this.keyRegistrationHandler = new KeyRegistrationHandler(eventSerializer, sender, connectionMono, routingKeyConverter);
+        this.eventDispatcher = new EventDispatcher(eventBusId, eventSerializer, sender, mailboxListenerRegistry);
+        this.keyRegistrationHandler = new KeyRegistrationHandler(eventBusId, eventSerializer, sender, connectionMono, routingKeyConverter, mailboxListenerRegistry);
     }
 
     public void start() {

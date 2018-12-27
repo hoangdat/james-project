@@ -23,6 +23,7 @@ import static org.apache.james.backend.rabbitmq.Constants.AUTO_DELETE;
 import static org.apache.james.backend.rabbitmq.Constants.DURABLE;
 import static org.apache.james.backend.rabbitmq.Constants.EXCLUSIVE;
 import static org.apache.james.backend.rabbitmq.Constants.NO_ARGUMENTS;
+import static org.apache.james.mailbox.events.RabbitMQEventBus.EVENT_BUS_ID;
 
 import java.nio.charset.StandardCharsets;
 
@@ -48,6 +49,7 @@ import reactor.rabbitmq.Sender;
 class KeyRegistrationHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(KeyRegistrationHandler.class);
 
+    private final EventBusId eventBusId;
     private final MailboxListenerRegistry mailboxListenerRegistry;
     private final EventSerializer eventSerializer;
     private final Sender sender;
@@ -57,11 +59,12 @@ class KeyRegistrationHandler {
     private final RegistrationBinder registrationBinder;
     private Disposable receiverSubscriber;
 
-    KeyRegistrationHandler(EventSerializer eventSerializer, Sender sender, Mono<Connection> connectionMono, RoutingKeyConverter routingKeyConverter) {
+    KeyRegistrationHandler(EventBusId eventBusId, EventSerializer eventSerializer, Sender sender, Mono<Connection> connectionMono, RoutingKeyConverter routingKeyConverter, MailboxListenerRegistry mailboxListenerRegistry) {
+        this.eventBusId = eventBusId;
         this.eventSerializer = eventSerializer;
         this.sender = sender;
         this.routingKeyConverter = routingKeyConverter;
-        this.mailboxListenerRegistry = new MailboxListenerRegistry();
+        this.mailboxListenerRegistry = mailboxListenerRegistry;
         this.receiver = RabbitFlux.createReceiver(new ReceiverOptions().connectionMono(connectionMono));
         this.registrationQueue = new RegistrationQueueName();
         this.registrationBinder = new RegistrationBinder(sender, registrationQueue);
@@ -106,11 +109,16 @@ class KeyRegistrationHandler {
         if (delivery.getBody() == null) {
             return Mono.empty();
         }
+
+        String serializedEventBusId = delivery.getProperties().getHeaders().get(EVENT_BUS_ID).toString();
+        EventBusId eventBusId = EventBusId.of(serializedEventBusId);
+
         String routingKey = delivery.getEnvelope().getRoutingKey();
         RegistrationKey registrationKey = routingKeyConverter.toRegistrationKey(routingKey);
         Event event = toEvent(delivery);
 
         return mailboxListenerRegistry.getLocalMailboxListeners(registrationKey)
+            .filter(any -> !checkInvalidListener(eventBusId, any))
             .flatMap(listener -> deliverEvent(listener, event))
             .subscribeOn(Schedulers.elastic())
             .then();
@@ -128,5 +136,10 @@ class KeyRegistrationHandler {
                 LOGGER.error("Exception happens when handling event of user {}", event.getUser().asString(), e);
             }
         });
+    }
+
+    private boolean checkInvalidListener(EventBusId eventBusId, MailboxListener listener) {
+        return eventBusId.equals(this.eventBusId) &&
+            listener.getExecutionMode() == MailboxListener.ExecutionMode.SYNCHRONOUS;
     }
 }
