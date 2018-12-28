@@ -24,6 +24,7 @@ import static org.apache.james.backend.rabbitmq.Constants.DURABLE;
 import static org.apache.james.backend.rabbitmq.Constants.EMPTY_ROUTING_KEY;
 import static org.apache.james.backend.rabbitmq.Constants.EXCLUSIVE;
 import static org.apache.james.backend.rabbitmq.Constants.NO_ARGUMENTS;
+import static org.apache.james.mailbox.events.RabbitMQEventBus.EVENT_BUS_ID;
 import static org.apache.james.mailbox.events.RabbitMQEventBus.MAILBOX_EVENT;
 import static org.apache.james.mailbox.events.RabbitMQEventBus.MAILBOX_EVENT_EXCHANGE_NAME;
 
@@ -78,6 +79,7 @@ class GroupRegistration implements Registration {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GroupRegistration.class);
 
+    private final EventBusId eventBusId;
     private final MailboxListener mailboxListener;
     private final WorkQueueName queueName;
     private final Receiver receiver;
@@ -86,8 +88,9 @@ class GroupRegistration implements Registration {
     private final EventSerializer eventSerializer;
     private Disposable receiverSubscriber;
 
-    GroupRegistration(Mono<Connection> connectionSupplier, Sender sender, EventSerializer eventSerializer,
+    GroupRegistration(EventBusId eventBusId, Mono<Connection> connectionSupplier, Sender sender, EventSerializer eventSerializer,
                               MailboxListener mailboxListener, Group group, Runnable unregisterGroup) {
+        this.eventBusId = eventBusId;
         this.eventSerializer = eventSerializer;
         this.mailboxListener = mailboxListener;
         this.queueName = WorkQueueName.of(group);
@@ -120,13 +123,27 @@ class GroupRegistration implements Registration {
     private void subscribeWorkQueue() {
         receiverSubscriber = receiver.consumeAutoAck(queueName.asString())
             .subscribeOn(Schedulers.parallel())
+            .flatMap(this::handleDelivery)
+            .subscribe();
+    }
+
+    private Mono<Void> handleDelivery(Delivery delivery) {
+        String serializedEventBusId = delivery.getProperties().getHeaders().get(EVENT_BUS_ID).toString();
+        EventBusId eventBusId = EventBusId.of(serializedEventBusId);
+
+        if (mailboxListener.getExecutionMode() == MailboxListener.ExecutionMode.SYNCHRONOUS
+            && eventBusId.equals(this.eventBusId)) {
+            return Mono.empty();
+        }
+
+        return Mono.just(delivery)
             .map(Delivery::getBody)
             .filter(Objects::nonNull)
             .map(eventInBytes -> new String(eventInBytes, StandardCharsets.UTF_8))
             .map(eventSerializer::fromJson)
             .map(JsResult::get)
             .subscribeOn(Schedulers.elastic())
-            .subscribe(event -> deliverEvent(mailboxListener, event));
+            .flatMap(event -> Mono.fromRunnable(() -> deliverEvent(mailboxListener, event)));
     }
 
     private void deliverEvent(MailboxListener mailboxListener, Event event) {
@@ -144,5 +161,9 @@ class GroupRegistration implements Registration {
         }
         receiver.close();
         unregisterGroup.run();
+    }
+
+    public MailboxListener getMailboxListener() {
+        return mailboxListener;
     }
 }

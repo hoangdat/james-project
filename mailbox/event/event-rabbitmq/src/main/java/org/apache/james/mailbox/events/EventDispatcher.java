@@ -31,6 +31,8 @@ import java.util.Set;
 import org.apache.james.event.json.EventSerializer;
 import org.apache.james.mailbox.Event;
 import org.apache.james.mailbox.MailboxListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableMap;
 import com.rabbitmq.client.AMQP;
@@ -43,16 +45,19 @@ import reactor.rabbitmq.OutboundMessage;
 import reactor.rabbitmq.Sender;
 
 class EventDispatcher {
+    private static final Logger LOGGER = LoggerFactory.getLogger(EventDispatcher.class);
     private final EventBusId eventBusId;
     private final EventSerializer eventSerializer;
     private final Sender sender;
     private final MailboxListenerRegistry mailboxListenerRegistry;
+    private final GroupRegistrationHandler groupRegistrationHandler;
 
-    EventDispatcher(EventBusId eventBusId, EventSerializer eventSerializer, Sender sender, MailboxListenerRegistry mailboxListenerRegistry) {
+    EventDispatcher(EventBusId eventBusId, EventSerializer eventSerializer, Sender sender, MailboxListenerRegistry mailboxListenerRegistry, GroupRegistrationHandler groupRegistrationHandler) {
         this.eventBusId = eventBusId;
         this.eventSerializer = eventSerializer;
         this.sender = sender;
         this.mailboxListenerRegistry = mailboxListenerRegistry;
+        this.groupRegistrationHandler = groupRegistrationHandler;
     }
 
     void start() {
@@ -63,12 +68,7 @@ class EventDispatcher {
     }
 
     Mono<Void> dispatch(Event event, Set<RegistrationKey> keys) {
-        Mono<Void> localListenerDelivery = Flux.fromIterable(keys)
-            .subscribeOn(Schedulers.elastic())
-            .flatMap(mailboxListenerRegistry::getLocalMailboxListeners)
-            .filter(mailboxListener -> mailboxListener.getExecutionMode() == MailboxListener.ExecutionMode.SYNCHRONOUS)
-            .flatMap(mailboxListener -> Mono.fromRunnable(() -> mailboxListener.event(event)))
-            .then().cache();
+        Mono<Void> localListenerDelivery = dispatchLocalListener(event, keys);
 
         Mono<byte[]> serializedEvent = Mono.just(event)
             .publishOn(Schedulers.parallel())
@@ -100,6 +100,22 @@ class EventDispatcher {
         return eventSerializer.toJson(event).getBytes(StandardCharsets.UTF_8);
     }
 
+    private Mono<Void> dispatchLocalListener(Event event, Set<RegistrationKey> keys) {
+        Flux<MailboxListener> localKeyListener = Flux.fromIterable(keys)
+            .flatMap(mailboxListenerRegistry::getLocalMailboxListeners);
+
+        Flux<MailboxListener> localGroupListener = Flux.fromIterable(groupRegistrationHandler
+            .getGroupRegistrations().values())
+            .map(groupRegistration -> groupRegistration.getMailboxListener());
+
+        return Flux.concat(localKeyListener, localGroupListener)
+            .subscribeOn(Schedulers.elastic())
+            .filter(mailboxListener -> mailboxListener.getExecutionMode() == MailboxListener.ExecutionMode.SYNCHRONOUS)
+            .flatMap(mailboxListener -> Mono.fromRunnable(() -> executeEvent(mailboxListener, event)))
+            .then()
+            .cache();
+    }
+
     private OutboundMessage generateMessage(String routingKey, byte[] payload) {
         Map<String, Object> headers = ImmutableMap
             .of(RabbitMQEventBus.EVENT_BUS_ID, eventBusId.getId().toString());
@@ -107,5 +123,13 @@ class EventDispatcher {
 
         return new OutboundMessage(MAILBOX_EVENT_EXCHANGE_NAME, routingKey, propertiesBuilder
             .headers(headers).build(), payload);
+    }
+
+    private void executeEvent(MailboxListener mailboxListener, Event event) {
+        try {
+            mailboxListener.event(event);
+        } catch (Exception e) {
+            LOGGER.error("Error while execute local listener: ", e);
+        }
     }
 }

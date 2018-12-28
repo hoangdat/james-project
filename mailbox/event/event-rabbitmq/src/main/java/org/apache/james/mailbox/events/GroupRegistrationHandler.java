@@ -31,12 +31,14 @@ import reactor.core.publisher.Mono;
 import reactor.rabbitmq.Sender;
 
 class GroupRegistrationHandler {
+    private final EventBusId eventBusId;
     private final Map<Group, GroupRegistration> groupRegistrations;
     private final EventSerializer eventSerializer;
     private final Sender sender;
     private final Mono<Connection> connectionMono;
 
-    GroupRegistrationHandler(EventSerializer eventSerializer, Sender sender, Mono<Connection> connectionMono) {
+    GroupRegistrationHandler(EventBusId eventBusId, EventSerializer eventSerializer, Sender sender, Mono<Connection> connectionMono) {
+        this.eventBusId = eventBusId;
         this.eventSerializer = eventSerializer;
         this.sender = sender;
         this.connectionMono = connectionMono;
@@ -60,11 +62,16 @@ class GroupRegistrationHandler {
 
     private GroupRegistration newRegistrationGroup(MailboxListener listener, Group group) {
         return new GroupRegistration(
+            eventBusId,
             connectionMono,
             sender,
             eventSerializer,
             listener,
             group,
             () -> groupRegistrations.remove(group));
+    }
+
+    Map<Group, GroupRegistration> getGroupRegistrations() {
+        return groupRegistrations;
     }
 }
