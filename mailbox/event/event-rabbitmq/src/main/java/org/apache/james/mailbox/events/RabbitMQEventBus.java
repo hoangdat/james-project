@@ -85,6 +85,9 @@ class RabbitMQEventBus implements EventBus {
 
     @Override
     public Mono<Void> dispatch(Event event, Set<RegistrationKey> keys) {
-        return eventDispatcher.dispatch(event, keys);
+        if (!event.isNoop()) {
+            return eventDispatcher.dispatch(event, keys);
+        }
+        return Mono.empty();
     }
 }
