@@ -24,6 +24,7 @@ import static org.apache.james.backend.rabbitmq.Constants.DURABLE;
 import static org.apache.james.backend.rabbitmq.Constants.EXCLUSIVE;
 import static org.apache.james.backend.rabbitmq.Constants.NO_ARGUMENTS;
 import static org.apache.james.mailbox.events.EventBusContract.EVENT;
+import static org.apache.james.mailbox.events.EventBusContract.NO_KEYS;
 import static org.apache.james.mailbox.events.RabbitMQEventBus.EMPTY_ROUTING_KEY;
 import static org.apache.james.mailbox.events.RabbitMQEventBus.MAILBOX_EVENT;
 import static org.apache.james.mailbox.events.RabbitMQEventBus.MAILBOX_EVENT_EXCHANGE_NAME;
@@ -93,14 +94,14 @@ class RabbitMQEventBusPublishingTest {
 
     @Test
     void dispatchShouldPublishSerializedEventToRabbitMQ() {
-        eventBus.dispatch(EVENT, ImmutableSet.of()).block();
+        eventBus.dispatch(EVENT, NO_KEYS).block();
 
         assertThat(dequeueEvent()).isEqualTo(EVENT);
     }
 
     @Test
     void dispatchShouldPublishSerializedEventToRabbitMQWhenNotBlocking() {
-        eventBus.dispatch(EVENT, ImmutableSet.of());
+        eventBus.dispatch(EVENT, NO_KEYS);
 
         assertThat(dequeueEvent()).isEqualTo(EVENT);
     }
