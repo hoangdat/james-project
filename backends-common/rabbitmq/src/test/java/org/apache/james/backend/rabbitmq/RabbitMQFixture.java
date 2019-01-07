@@ -26,10 +26,7 @@ import org.awaitility.Awaitility;
 import org.awaitility.Duration;
 import org.awaitility.core.ConditionFactory;
 
-import com.rabbitmq.client.AMQP;
-
 public interface RabbitMQFixture {
-    AMQP.BasicProperties NO_PROPERTIES = null;
     String EXCHANGE_NAME = "exchangeName";
     String ROUTING_KEY = "routingKey";
     String WORK_QUEUE = "workQueue";

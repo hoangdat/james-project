@@ -20,6 +20,7 @@
 package org.apache.james.backend.rabbitmq;
 
 import com.google.common.collect.ImmutableMap;
+import com.rabbitmq.client.AMQP;
 
 public interface Constants {
     boolean DURABLE = true;
@@ -33,6 +34,8 @@ public interface Constants {
     boolean REQUEUE = true;
 
     String DIRECT_EXCHANGE = "direct";
+
+    AMQP.BasicProperties NO_PROPERTIES = new AMQP.BasicProperties();
 
     ImmutableMap<String, Object> NO_ARGUMENTS = ImmutableMap.of();
 }
