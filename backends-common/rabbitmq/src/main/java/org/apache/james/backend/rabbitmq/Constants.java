@@ -19,32 +19,20 @@
 
 package org.apache.james.backend.rabbitmq;
 
-import static org.awaitility.Duration.ONE_HUNDRED_MILLISECONDS;
-import static org.awaitility.Duration.ONE_MINUTE;
+import com.google.common.collect.ImmutableMap;
 
-import org.awaitility.Awaitility;
-import org.awaitility.Duration;
-import org.awaitility.core.ConditionFactory;
+public interface Constants {
+    boolean DURABLE = true;
+    boolean AUTO_DELETE = true;
+    boolean EXCLUSIVE = true;
 
-import com.rabbitmq.client.AMQP;
+    boolean AUTO_ACK = true;
+    boolean MULTIPLE = true;
 
-public interface RabbitMQFixture {
-    AMQP.BasicProperties NO_PROPERTIES = null;
-    String EXCHANGE_NAME = "exchangeName";
-    String ROUTING_KEY = "routingKey";
-    String WORK_QUEUE = "workQueue";
+    String EMPTY_ROUTING_KEY = "";
+    boolean REQUEUE = true;
 
-    String DEFAULT_USER = "guest";
-    String DEFAULT_PASSWORD_STRING = "guest";
-    char[] DEFAULT_PASSWORD = DEFAULT_PASSWORD_STRING.toCharArray();
-    RabbitMQConfiguration.ManagementCredentials DEFAULT_MANAGEMENT_CREDENTIAL = new RabbitMQConfiguration.ManagementCredentials(DEFAULT_USER, DEFAULT_PASSWORD);
+    String DIRECT_EXCHANGE = "direct";
 
-    Duration slowPacedPollInterval = ONE_HUNDRED_MILLISECONDS;
-    ConditionFactory calmlyAwait = Awaitility.with()
-        .pollInterval(slowPacedPollInterval)
-        .and()
-        .with()
-        .pollDelay(slowPacedPollInterval)
-        .await();
-    ConditionFactory awaitAtMostOneMinute = calmlyAwait.atMost(ONE_MINUTE);
+    ImmutableMap<String, Object> NO_ARGUMENTS = ImmutableMap.of();
 }
