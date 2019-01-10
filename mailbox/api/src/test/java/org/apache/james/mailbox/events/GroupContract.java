@@ -21,7 +21,7 @@ package org.apache.james.mailbox.events;
 
 import static org.apache.james.mailbox.events.EventBusTestFixture.EVENT;
 import static org.apache.james.mailbox.events.EventBusTestFixture.FIVE_HUNDRED_MS;
-import static org.apache.james.mailbox.events.EventBusTestFixture.GroupA;
+import static org.apache.james.mailbox.events.EventBusTestFixture.GROUP_A;
 import static org.apache.james.mailbox.events.EventBusTestFixture.GroupB;
 import static org.apache.james.mailbox.events.EventBusTestFixture.NO_KEYS;
 import static org.apache.james.mailbox.events.EventBusTestFixture.ONE_SECOND;
@@ -57,7 +57,7 @@ public interface GroupContract {
         default void listenerGroupShouldReceiveEvents() {
             MailboxListener listener = newListener();
 
-            eventBus().register(listener, new GroupA());
+            eventBus().register(listener, GROUP_A);
 
             eventBus().dispatch(EVENT, NO_KEYS).block();
 
@@ -68,7 +68,7 @@ public interface GroupContract {
         default void groupListenersShouldNotReceiveNoopEvents() {
             MailboxListener listener = newListener();
 
-            eventBus().register(listener, new GroupA());
+            eventBus().register(listener, GROUP_A);
 
             MailboxListener.Added noopEvent = new MailboxListener.Added(MailboxSession.SessionId.of(18), User.fromUsername("bob"), MailboxPath.forUser("bob", "mailbox"), TestId.of(58), ImmutableSortedMap.of(), Event.EventId.random());
             eventBus().dispatch(noopEvent, NO_KEYS).block();
@@ -82,7 +82,7 @@ public interface GroupContract {
             MailboxListener listener = newListener();
             doThrow(new RuntimeException()).when(listener).event(any());
 
-            eventBus().register(listener, new GroupA());
+            eventBus().register(listener, GROUP_A);
 
             assertThatCode(() -> eventBus().dispatch(EVENT, NO_KEYS).block())
                 .doesNotThrowAnyException();
@@ -92,7 +92,7 @@ public interface GroupContract {
         default void eachListenerGroupShouldReceiveEvents() {
             MailboxListener listener = newListener();
             MailboxListener listener2 = newListener();
-            eventBus().register(listener, new GroupA());
+            eventBus().register(listener, GROUP_A);
             eventBus().register(listener2, new GroupB());
 
             eventBus().dispatch(EVENT, NO_KEYS).block();
@@ -104,7 +104,7 @@ public interface GroupContract {
         @Test
         default void unregisteredGroupListenerShouldNotReceiveEvents() {
             MailboxListener listener = newListener();
-            Registration registration = eventBus().register(listener, new GroupA());
+            Registration registration = eventBus().register(listener, GROUP_A);
 
             registration.unregister();
 
@@ -118,9 +118,9 @@ public interface GroupContract {
             MailboxListener listener = newListener();
             MailboxListener listener2 = newListener();
 
-            eventBus().register(listener, new GroupA());
+            eventBus().register(listener, GROUP_A);
 
-            assertThatThrownBy(() -> eventBus().register(listener2, new GroupA()))
+            assertThatThrownBy(() -> eventBus().register(listener2, GROUP_A))
                 .isInstanceOf(GroupAlreadyRegistered.class);
         }
 
@@ -129,9 +129,9 @@ public interface GroupContract {
             MailboxListener listener = newListener();
             MailboxListener listener2 = newListener();
 
-            eventBus().register(listener, new GroupA()).unregister();
+            eventBus().register(listener, GROUP_A).unregister();
 
-            assertThatCode(() -> eventBus().register(listener2, new GroupA()))
+            assertThatCode(() -> eventBus().register(listener2, GROUP_A))
                 .doesNotThrowAnyException();
         }
 
@@ -139,7 +139,7 @@ public interface GroupContract {
         default void unregisterShouldBeIdempotentForGroups() {
             MailboxListener listener = newListener();
 
-            Registration registration = eventBus().register(listener, new GroupA());
+            Registration registration = eventBus().register(listener, GROUP_A);
             registration.unregister();
 
             assertThatCode(registration::unregister)
@@ -150,8 +150,8 @@ public interface GroupContract {
         default void registerShouldAcceptAlreadyUnregisteredGroups() {
             MailboxListener listener = newListener();
 
-            eventBus().register(listener, new GroupA()).unregister();
-            eventBus().register(listener, new GroupA());
+            eventBus().register(listener, GROUP_A).unregister();
+            eventBus().register(listener, GROUP_A);
 
             eventBus().dispatch(EVENT, NO_KEYS).block();
 
@@ -162,7 +162,7 @@ public interface GroupContract {
         default void dispatchShouldCallSynchronousListener() {
             MailboxListener listener = newListener();
 
-            eventBus().register(listener, new GroupA());
+            eventBus().register(listener, GROUP_A);
 
             eventBus().dispatch(EVENT, NO_KEYS).block();
 
@@ -172,7 +172,7 @@ public interface GroupContract {
         @Test
         default void failingGroupListenersShouldNotAbortGroupDelivery() {
             EventBusTestFixture.MailboxListenerCountingSuccessfulExecution listener = spy(new EventBusTestFixture.MailboxListenerCountingSuccessfulExecution());
-            eventBus().register(listener, new GroupA());
+            eventBus().register(listener, GROUP_A);
 
             doThrow(new RuntimeException())
                 .doCallRealMethod()
@@ -193,7 +193,7 @@ public interface GroupContract {
             when(listener.getExecutionMode()).thenReturn(MailboxListener.ExecutionMode.SYNCHRONOUS);
             doThrow(new RuntimeException()).when(failingListener).event(any());
 
-            eventBus().register(failingListener, new GroupA());
+            eventBus().register(failingListener, GROUP_A);
             eventBus().register(listener, new GroupB());
 
             eventBus().dispatch(EVENT, NO_KEYS).block();
@@ -208,7 +208,7 @@ public interface GroupContract {
         default void groupsDefinedOnlyOnSomeNodesShouldBeNotified() {
             MailboxListener mailboxListener = newListener();
 
-            eventBus().register(mailboxListener, new GroupA());
+            eventBus().register(mailboxListener, GROUP_A);
 
             eventBus2().dispatch(EVENT, NO_KEYS).block();
 
@@ -219,8 +219,8 @@ public interface GroupContract {
         default void groupListenersShouldBeExecutedOnceInAControlledEnvironment() {
             MailboxListener mailboxListener = newListener();
 
-            eventBus().register(mailboxListener, new GroupA());
-            eventBus2().register(mailboxListener, new GroupA());
+            eventBus().register(mailboxListener, GROUP_A);
+            eventBus2().register(mailboxListener, GROUP_A);
 
             eventBus2().dispatch(EVENT, NO_KEYS).block();
 
@@ -231,7 +231,7 @@ public interface GroupContract {
         default void unregisterShouldStopNotificationForDistantGroups() {
             MailboxListener mailboxListener = newListener();
 
-            eventBus().register(mailboxListener, new GroupA()).unregister();
+            eventBus().register(mailboxListener, GROUP_A).unregister();
 
             eventBus2().dispatch(EVENT, NO_KEYS).block();
 
