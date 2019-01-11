@@ -29,8 +29,6 @@ import static org.apache.james.mailbox.events.EventBusTestFixture.ALL_GROUPS;
 import static org.apache.james.mailbox.events.EventBusTestFixture.EVENT;
 import static org.apache.james.mailbox.events.EventBusTestFixture.GROUP_A;
 import static org.apache.james.mailbox.events.EventBusTestFixture.GroupA;
-import static org.apache.james.mailbox.events.EventBusTestFixture.GroupB;
-import static org.apache.james.mailbox.events.EventBusTestFixture.GroupC;
 import static org.apache.james.mailbox.events.EventBusTestFixture.KEY_1;
 import static org.apache.james.mailbox.events.EventBusTestFixture.MailboxListenerCountingSuccessfulExecution;
 import static org.apache.james.mailbox.events.EventBusTestFixture.NO_KEYS;
@@ -243,7 +241,7 @@ class RabbitMQEventBusTest implements GroupContract.SingleEventBusGroupContract,
                 eventBus.start();
 
                 MailboxListenerCountingSuccessfulExecution listener = new MailboxListenerCountingSuccessfulExecution();
-                eventBus.register(listener, GROUP_A); // (1)
+                eventBus.register(listener, GROUP_A);
 
                 int threadCount = 10;
                 int operationCount = 1000;

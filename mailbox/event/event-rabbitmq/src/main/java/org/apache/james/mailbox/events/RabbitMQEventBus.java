@@ -53,11 +53,10 @@ class RabbitMQEventBus implements EventBus {
         this.connectionMono = Mono.fromSupplier(rabbitMQConnectionFactory::create).cache();
         this.eventSerializer = eventSerializer;
         isRunning = new AtomicBoolean(false);
-
     }
 
     public void start() {
-        if (isRunning == null || !isRunning.get()) {
+        if (!isRunning.get()) {
             sender = RabbitFlux.createSender(new SenderOptions().connectionMono(connectionMono));
             groupRegistrationHandler = new GroupRegistrationHandler(eventSerializer, sender, connectionMono);
             eventDispatcher = new EventDispatcher(eventSerializer, sender);
