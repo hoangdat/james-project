@@ -116,6 +116,7 @@ class RabbitMQEventBusTest implements GroupContract.SingleEventBusGroupContract,
 
     private RabbitMQEventBus eventBus;
     private RabbitMQEventBus eventBus2;
+    private RabbitMQEventBus eventBus3;
     private Sender sender;
     private RabbitMQConnectionFactory connectionFactory;
     private EventSerializer eventSerializer;
@@ -132,8 +133,10 @@ class RabbitMQEventBusTest implements GroupContract.SingleEventBusGroupContract,
 
         eventBus = new RabbitMQEventBus(connectionFactory, eventSerializer, routingKeyConverter);
         eventBus2 = new RabbitMQEventBus(connectionFactory, eventSerializer, routingKeyConverter);
+        eventBus3 = new RabbitMQEventBus(connectionFactory, eventSerializer, routingKeyConverter);
         eventBus.start();
         eventBus2.start();
+        eventBus3.start();
         sender = RabbitFlux.createSender(new SenderOptions().connectionMono(connectionMono));
     }
 
@@ -141,6 +144,7 @@ class RabbitMQEventBusTest implements GroupContract.SingleEventBusGroupContract,
     void tearDown() {
         eventBus.stop();
         eventBus2.stop();
+        eventBus3.stop();
         ALL_GROUPS.stream()
             .map(groupClass -> GroupRegistration.WorkQueueName.of(groupClass).asString())
             .forEach(queueName -> sender.delete(QueueSpecification.queue(queueName)).block());
@@ -156,6 +160,16 @@ class RabbitMQEventBusTest implements GroupContract.SingleEventBusGroupContract,
     @Override
     public EventBus eventBus2() {
         return eventBus2;
+    }
+
+    @Override
+    public EventBus eventBus3() {
+        return eventBus3;
+    }
+
+    @Override
+    public void concurrentDispatchGroupShouldDeliverAllEventsToListenersWithMultipleEventBus() throws Exception {
+
     }
 
     @Override
@@ -303,19 +317,6 @@ class RabbitMQEventBusTest implements GroupContract.SingleEventBusGroupContract,
 
         @Nested
         class MultiEventBus {
-
-            private RabbitMQEventBus eventBus3;
-
-            @BeforeEach
-            void setUp() {
-                eventBus3 = new RabbitMQEventBus(connectionFactory, eventSerializer, routingKeyConverter);
-                eventBus3.start();
-            }
-
-            @AfterEach
-            void tearDown() {
-                eventBus3.stop();
-            }
 
             @Test
             void multipleEventBusStartShouldCreateOnlyOneEventExchange() {
