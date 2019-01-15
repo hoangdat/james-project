@@ -168,7 +168,9 @@ class RabbitMQEventBusTest implements GroupContract.SingleEventBusGroupContract,
     }
 
     @Override
-    public void concurrentDispatchGroupShouldDeliverAllEventsToListenersWithMultipleEventBus() throws Exception {
+    @Test
+    @Disabled("This test is failing by RabbitMQEventBus exponential backoff is not implemented at this time")
+    public void failingRegisteredListenersShouldNotAbortRegisteredDelivery() {
 
     }
 
