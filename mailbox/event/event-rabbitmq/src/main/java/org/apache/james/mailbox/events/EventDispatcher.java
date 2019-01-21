@@ -48,16 +48,18 @@ import reactor.rabbitmq.Sender;
 public class EventDispatcher {
     private static final Logger LOGGER = LoggerFactory.getLogger(EventDispatcher.class);
 
-    private final EventBusId eventBusId;
     private final EventSerializer eventSerializer;
     private final Sender sender;
     private final MailboxListenerRegistry mailboxListenerRegistry;
+    private final AMQP.BasicProperties basicProperties;
 
     EventDispatcher(EventBusId eventBusId, EventSerializer eventSerializer, Sender sender, MailboxListenerRegistry mailboxListenerRegistry) {
-        this.eventBusId = eventBusId;
         this.eventSerializer = eventSerializer;
         this.sender = sender;
         this.mailboxListenerRegistry = mailboxListenerRegistry;
+        this.basicProperties = new AMQP.BasicProperties.Builder()
+            .headers(ImmutableMap.of(EVENT_BUS_ID, eventBusId.asString()))
+            .build();
     }
 
     void start() {
@@ -75,7 +77,7 @@ public class EventDispatcher {
             .flatMap(mailboxListener -> Mono.fromRunnable(Throwing.runnable(() -> mailboxListener.event(event)))
                 .doOnError(e -> LOGGER.error("Exception happens when handling event of user {}", event.getUser().asString(), e))
                 .onErrorResume(e -> Mono.empty()))
-            .then().cache();
+            .then();
 
         Mono<byte[]> serializedEvent = Mono.just(event)
             .publishOn(Schedulers.parallel())
@@ -96,20 +98,12 @@ public class EventDispatcher {
 
         Flux<OutboundMessage> outboundMessages = routingKeys
             .flatMap(routingKey -> serializedEvent
-                .map(payload -> generateMessage(routingKey, payload)));
+                .map(payload -> new OutboundMessage(MAILBOX_EVENT_EXCHANGE_NAME, routingKey.asString(), basicProperties, payload)));
 
         return sender.send(outboundMessages);
     }
 
     private byte[] serializeEvent(Event event) {
         return eventSerializer.toJson(event).getBytes(StandardCharsets.UTF_8);
-    }
-
-    private OutboundMessage generateMessage(RoutingKeyConverter.RoutingKey routingKey, byte[] payload) {
-        AMQP.BasicProperties properties = new AMQP.BasicProperties.Builder()
-            .headers(ImmutableMap.of(EVENT_BUS_ID, eventBusId.asString()))
-            .build();
-
-        return new OutboundMessage(MAILBOX_EVENT_EXCHANGE_NAME, routingKey.asString(), properties, payload);
     }
 }

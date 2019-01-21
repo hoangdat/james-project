@@ -122,8 +122,8 @@ public class KeyRegistrationHandler {
             .flatMap(listener -> Mono.fromRunnable(Throwing.runnable(() -> listener.event(event)))
                 .doOnError(e -> LOGGER.error("Exception happens when handling event of user {}", event.getUser().asString(), e))
                 .onErrorResume(e -> Mono.empty())
-                .then().cache())
-            .subscribeOn(Schedulers.parallel())
+                .then())
+            .subscribeOn(Schedulers.elastic())
             .then();
     }
 
