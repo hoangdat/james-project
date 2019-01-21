@@ -41,4 +41,10 @@ public class EventBusIdTest {
         assertThat(EventBusId.of(UUID_1.toString()))
             .isEqualTo(EventBusId.of(UUID_1));
     }
+
+    @Test
+    void asStringShouldReturnWrappedValue() {
+        assertThat(EventBusId.of(UUID_1).asString())
+            .isEqualTo("6e0dd59d-660e-4d9b-b22f-0354479f47b4");
+    }
 }
