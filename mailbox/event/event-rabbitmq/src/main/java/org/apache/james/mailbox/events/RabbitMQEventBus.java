@@ -30,15 +30,22 @@ import org.apache.james.event.json.EventSerializer;
 import org.apache.james.mailbox.Event;
 import org.apache.james.mailbox.MailboxListener;
 import org.apache.james.metrics.api.MetricFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import com.github.fge.lambdas.Throwing;
+import com.google.common.annotations.VisibleForTesting;
 import com.rabbitmq.client.Connection;
 
 import reactor.core.publisher.Mono;
 import reactor.rabbitmq.RabbitFlux;
+import reactor.rabbitmq.SendOptions;
 import reactor.rabbitmq.Sender;
 import reactor.rabbitmq.SenderOptions;
 
 public class RabbitMQEventBus implements EventBus {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RabbitMQEventBus.class);
+
     static final String MAILBOX_EVENT = "mailboxEvent";
     static final String MAILBOX_EVENT_EXCHANGE_NAME = MAILBOX_EVENT + "-exchange";
     static final String EVENT_BUS_ID = "eventBusId";
@@ -51,6 +58,7 @@ public class RabbitMQEventBus implements EventBus {
     private final EventBusId eventBusId;
     private final EventDeadLetters eventDeadLetters;
     private final MailboxListenerExecutor mailboxListenerExecutor;
+    private final SendOptions sendOptions;
 
     private GroupRegistrationHandler groupRegistrationHandler;
     private KeyRegistrationHandler keyRegistrationHandler;
@@ -70,6 +78,9 @@ public class RabbitMQEventBus implements EventBus {
         this.retryBackoff = retryBackoff;
         this.eventDeadLetters = eventDeadLetters;
         this.isRunning = new AtomicBoolean(false);
+        this.sendOptions = new SendOptions()
+            .channelMono(connectionMono.map(Throwing.function(connection -> connection.createChannel())).cache())
+            .channelCloseHandler(((signalType, channel) -> LOGGER.info("Do not close channel {} by signal {}", channel, signalType)));
     }
 
     public void start() {
@@ -77,8 +88,8 @@ public class RabbitMQEventBus implements EventBus {
             sender = RabbitFlux.createSender(new SenderOptions().connectionMono(connectionMono));
             MailboxListenerRegistry mailboxListenerRegistry = new MailboxListenerRegistry();
             keyRegistrationHandler = new KeyRegistrationHandler(eventBusId, eventSerializer, sender, connectionMono, routingKeyConverter, mailboxListenerRegistry, mailboxListenerExecutor);
-            groupRegistrationHandler = new GroupRegistrationHandler(eventSerializer, sender, connectionMono, retryBackoff, eventDeadLetters, mailboxListenerExecutor);
-            eventDispatcher = new EventDispatcher(eventBusId, eventSerializer, sender, mailboxListenerRegistry, mailboxListenerExecutor);
+            groupRegistrationHandler = new GroupRegistrationHandler(eventSerializer, sender, sendOptions, connectionMono, retryBackoff, eventDeadLetters, mailboxListenerExecutor);
+            eventDispatcher = new EventDispatcher(eventBusId, eventSerializer, sender, sendOptions, mailboxListenerRegistry, mailboxListenerExecutor);
 
             eventDispatcher.start();
             keyRegistrationHandler.start();
@@ -112,5 +123,10 @@ public class RabbitMQEventBus implements EventBus {
             return eventDispatcher.dispatch(event, key);
         }
         return Mono.empty();
+    }
+
+    @VisibleForTesting
+    SendOptions getSendOptions() {
+        return sendOptions;
     }
 }

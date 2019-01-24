@@ -54,6 +54,8 @@ import reactor.rabbitmq.Sender;
 class KeyRegistrationHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(KeyRegistrationHandler.class);
 
+    private static final String QUEUE_NAME_FOR_SERVER_GENERATE_NAME = "";
+
     private final EventBusId eventBusId;
     private final MailboxListenerRegistry mailboxListenerRegistry;
     private final EventSerializer eventSerializer;
@@ -78,7 +80,7 @@ class KeyRegistrationHandler {
     }
 
     void start() {
-        sender.declareQueue(QueueSpecification.queue()
+        sender.declareQueue(QueueSpecification.queue(QUEUE_NAME_FOR_SERVER_GENERATE_NAME)
             .durable(DURABLE)
             .exclusive(EXCLUSIVE)
             .autoDelete(AUTO_DELETE)

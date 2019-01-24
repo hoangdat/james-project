@@ -41,6 +41,7 @@ import reactor.core.publisher.Mono;
 import reactor.rabbitmq.BindingSpecification;
 import reactor.rabbitmq.ExchangeSpecification;
 import reactor.rabbitmq.OutboundMessage;
+import reactor.rabbitmq.SendOptions;
 import reactor.rabbitmq.Sender;
 
 class GroupConsumerRetry {
@@ -71,9 +72,11 @@ class GroupConsumerRetry {
     private final RetryBackoffConfiguration retryBackoff;
     private final EventDeadLetters eventDeadLetters;
     private final Group group;
+    private final SendOptions sendOptions;
 
-    GroupConsumerRetry(Sender sender, Group group, RetryBackoffConfiguration retryBackoff, EventDeadLetters eventDeadLetters) {
+    GroupConsumerRetry(Sender sender, SendOptions sendOptions, Group group, RetryBackoffConfiguration retryBackoff, EventDeadLetters eventDeadLetters) {
         this.sender = sender;
+        this.sendOptions = sendOptions;
         this.retryExchangeName = RetryExchangeName.of(group);
         this.retryBackoff = retryBackoff;
         this.eventDeadLetters = eventDeadLetters;
@@ -114,7 +117,7 @@ class GroupConsumerRetry {
                 .build(),
             eventAsByte));
 
-        return sender.send(retryMessage)
+        return sender.send(retryMessage, sendOptions)
             .doOnError(throwable -> createStructuredLogger(event)
                 .log(logger -> logger.error("Exception happens when publishing event to retry exchange, this event will be stored in deadLetter", throwable)))
             .onErrorResume(e -> eventDeadLetters.store(group, event));
