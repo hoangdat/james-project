@@ -17,24 +17,13 @@
  * under the License.                                           *
  ****************************************************************/
 
-package org.apache.james.mailbox.events;
+package org.apache.james.mailbox.events.tables;
 
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+public interface CassandraEventDeadLettersTable {
 
-public interface EventDeadLetters {
+    String TABLE_NAME = "event_dead_letters";
 
-    String REGISTERED_GROUP_CANNOT_BE_NULL = "registeredGroup cannot be null";
-    String FAIL_DELIVERED_EVENT_CANNOT_BE_NULL = "failDeliveredEvent cannot be null";
-    String FAIL_DELIVERED_ID_EVENT_CANNOT_BE_NULL = "failDeliveredEventId cannot be null";
-
-    Mono<Void> store(Group registeredGroup, Event failDeliveredEvent);
-
-    Mono<Void> remove(Group registeredGroup, Event.EventId failDeliveredEventId);
-
-    Mono<Event> failedEvent(Group registeredGroup, Event.EventId failDeliveredEventId);
-
-    Flux<Event.EventId> failedEventIds(Group registeredGroup);
-
-    Flux<Group> groupsWithFailedEvents();
+    String GROUP = "group";
+    String EVENT_ID = "eventId";
+    String EVENT = "event";
 }

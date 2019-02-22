@@ -19,22 +19,23 @@
 
 package org.apache.james.mailbox.events;
 
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+import org.apache.james.backends.cassandra.components.CassandraModule;
+import org.apache.james.backends.cassandra.utils.CassandraConstants;
+import org.apache.james.mailbox.events.tables.CassandraEventDeadLettersTable;
 
-public interface EventDeadLetters {
+import com.datastax.driver.core.DataType;
+import com.datastax.driver.core.schemabuilder.SchemaBuilder;
 
-    String REGISTERED_GROUP_CANNOT_BE_NULL = "registeredGroup cannot be null";
-    String FAIL_DELIVERED_EVENT_CANNOT_BE_NULL = "failDeliveredEvent cannot be null";
-    String FAIL_DELIVERED_ID_EVENT_CANNOT_BE_NULL = "failDeliveredEventId cannot be null";
-
-    Mono<Void> store(Group registeredGroup, Event failDeliveredEvent);
-
-    Mono<Void> remove(Group registeredGroup, Event.EventId failDeliveredEventId);
-
-    Mono<Event> failedEvent(Group registeredGroup, Event.EventId failDeliveredEventId);
-
-    Flux<Event.EventId> failedEventIds(Group registeredGroup);
-
-    Flux<Group> groupsWithFailedEvents();
+public interface CassandraEventDeadLettersModule {
+    CassandraModule MODULE = CassandraModule.builder()
+        .table(CassandraEventDeadLettersTable.TABLE_NAME)
+        .comment("Holds event dead letter")
+        .options(options -> options
+            .caching(SchemaBuilder.KeyCaching.ALL,
+                SchemaBuilder.rows(CassandraConstants.DEFAULT_CACHED_ROW_PER_PARTITION)))
+        .statement(statement -> statement
+            .addPartitionKey(CassandraEventDeadLettersTable.GROUP, DataType.text())
+            .addClusteringColumn(CassandraEventDeadLettersTable.EVENT_ID, DataType.uuid())
+            .addColumn(CassandraEventDeadLettersTable.EVENT, DataType.text()))
+        .build();
 }
