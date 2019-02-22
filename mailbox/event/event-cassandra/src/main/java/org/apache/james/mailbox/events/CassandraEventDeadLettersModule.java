@@ -21,6 +21,7 @@ package org.apache.james.mailbox.events;
 
 import org.apache.james.backends.cassandra.components.CassandraModule;
 import org.apache.james.backends.cassandra.utils.CassandraConstants;
+import org.apache.james.mailbox.events.tables.CassandraEventDeadLettersGroupTable;
 import org.apache.james.mailbox.events.tables.CassandraEventDeadLettersTable;
 
 import com.datastax.driver.core.DataType;
@@ -37,5 +38,12 @@ public interface CassandraEventDeadLettersModule {
             .addPartitionKey(CassandraEventDeadLettersTable.GROUP, DataType.text())
             .addClusteringColumn(CassandraEventDeadLettersTable.EVENT_ID, DataType.uuid())
             .addColumn(CassandraEventDeadLettersTable.EVENT, DataType.text()))
+        .table(CassandraEventDeadLettersGroupTable.TABLE_NAME)
+        .comment("Projection table for retrieving groups for all failed events")
+        .options(options -> options
+            .caching(SchemaBuilder.KeyCaching.ALL,
+                SchemaBuilder.rows(CassandraConstants.DEFAULT_CACHED_ROW_PER_PARTITION)))
+        .statement(statement -> statement
+            .addPartitionKey(CassandraEventDeadLettersGroupTable.GROUP, DataType.text()))
         .build();
 }

@@ -396,7 +396,7 @@ interface EventDeadLettersContract {
             eventDeadLetters.store(GROUP_A, EVENT_1).block();
             eventDeadLetters.store(GROUP_B, EVENT_1).block();
 
-            assertThat(eventDeadLetters.groupsWithFailedEvents().toStream())
+            assertThat(eventDeadLetters.groupsWithFailedEvents().collectList().block())
                 .containsOnly(GROUP_A, GROUP_B);
         }
 
@@ -405,6 +405,31 @@ interface EventDeadLettersContract {
             EventDeadLetters eventDeadLetters = eventDeadLetters();
 
             assertThat(eventDeadLetters.groupsWithFailedEvents().toStream()).isEmpty();
+        }
+
+        @Test
+        default void groupsWithFailedEventShouldReturnRemainStoredGroupsAfterRemoveOneEvent() {
+            EventDeadLetters eventDeadLetters = eventDeadLetters();
+            eventDeadLetters.store(GROUP_A, EVENT_1).block();
+            eventDeadLetters.store(GROUP_B, EVENT_2).block();
+
+            eventDeadLetters.remove(GROUP_B, EVENT_ID_2).block();
+
+            assertThat(eventDeadLetters.groupsWithFailedEvents().collectList().block())
+                .containsOnly(GROUP_A);
+        }
+
+        @Test
+        default void groupsWithFailedEventShouldReturnAllStoredGroupsAfterRemoveOneEventInMany() {
+            EventDeadLetters eventDeadLetters = eventDeadLetters();
+            eventDeadLetters.store(GROUP_A, EVENT_1).block();
+            eventDeadLetters.store(GROUP_A, EVENT_2).block();
+            eventDeadLetters.store(GROUP_B, EVENT_1).block();
+
+            eventDeadLetters.remove(GROUP_A, EVENT_ID_1).block();
+
+            assertThat(eventDeadLetters.groupsWithFailedEvents().collectList().block())
+                .containsOnly(GROUP_A, GROUP_B);
         }
     }
 }
