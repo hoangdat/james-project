@@ -42,14 +42,12 @@ public class CassandraEventDeadLettersGroupDAO {
     private final CassandraAsyncExecutor executor;
     private final PreparedStatement insertStatement;
     private final PreparedStatement selectAllStatement;
-    private final PreparedStatement removeStatement;
 
     @Inject
     CassandraEventDeadLettersGroupDAO(Session session) {
         this.executor = new CassandraAsyncExecutor(session);
         this.insertStatement = prepareInsertStatement(session);
         this.selectAllStatement = prepareSelectStatement(session);
-        this.removeStatement = prepareRemoveStatement(session);
     }
 
     private PreparedStatement prepareInsertStatement(Session session) {
@@ -62,19 +60,8 @@ public class CassandraEventDeadLettersGroupDAO {
             .from(TABLE_NAME));
     }
 
-    private PreparedStatement prepareRemoveStatement(Session session) {
-        return session.prepare(delete()
-            .from(TABLE_NAME)
-            .where(eq(GROUP, bindMarker(GROUP))));
-    }
-
     Mono<Void> storeGroup(Group group) {
         return executor.executeVoid(insertStatement.bind()
-                .setString(GROUP, group.asString()));
-    }
-
-    Mono<Void> removeGroup(Group group) {
-        return executor.executeVoid(removeStatement.bind()
                 .setString(GROUP, group.asString()));
     }
 

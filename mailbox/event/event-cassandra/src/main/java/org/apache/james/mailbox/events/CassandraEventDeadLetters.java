@@ -52,11 +52,7 @@ public class CassandraEventDeadLetters implements EventDeadLetters {
         Preconditions.checkArgument(registeredGroup != null, REGISTERED_GROUP_CANNOT_BE_NULL);
         Preconditions.checkArgument(failDeliveredEventId != null, FAIL_DELIVERED_ID_EVENT_CANNOT_BE_NULL);
 
-        return cassandraEventDeadLettersDAO.removeEvent(registeredGroup, failDeliveredEventId)
-            .then(failedEventIds(registeredGroup)
-                .hasElements()
-                .filter(Boolean.FALSE::equals)
-                .flatMap(value -> cassandraEventDeadLettersGroupDAO.removeGroup(registeredGroup)));
+        return cassandraEventDeadLettersDAO.removeEvent(registeredGroup, failDeliveredEventId);
     }
 
     @Override

@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.apache.james.backends.cassandra.CassandraCluster;
 import org.apache.james.backends.cassandra.CassandraClusterExtension;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
@@ -34,41 +34,27 @@ public class CassandraEventDeadLettersGroupDAOTest {
     @RegisterExtension
     static CassandraClusterExtension cassandraClusterExtension = new CassandraClusterExtension(CassandraEventDeadLettersModule.MODULE);
 
-    private CassandraEventDeadLettersGroupDAO groupDAO;
+    private static CassandraEventDeadLettersGroupDAO GROUP_DAO;
 
-    @BeforeEach
-    void setUp(CassandraCluster cassandraCluster) {
-        groupDAO = new CassandraEventDeadLettersGroupDAO(cassandraCluster.getConf());
+    @BeforeAll
+    static void setUp(CassandraCluster cassandraCluster) {
+        GROUP_DAO = new CassandraEventDeadLettersGroupDAO(cassandraCluster.getConf());
     }
 
     @Test
     void retrieveAllGroupsShouldReturnEmptyWhenDefault() {
-        assertThat(groupDAO.retrieveAllGroups()
+        assertThat(GROUP_DAO.retrieveAllGroups()
                 .collectList().block())
             .isEmpty();
     }
 
     @Test
     void retrieveAllGroupsShouldReturnStoredGroups() {
-        groupDAO.storeGroup(GROUP_A).block();
-        groupDAO.storeGroup(GROUP_B).block();
-        groupDAO.storeGroup(GROUP_B).block();
+        GROUP_DAO.storeGroup(GROUP_A).block();
+        GROUP_DAO.storeGroup(GROUP_B).block();
 
-        assertThat(groupDAO.retrieveAllGroups()
+        assertThat(GROUP_DAO.retrieveAllGroups()
                 .collectList().block())
             .containsOnly(GROUP_A, GROUP_B);
-    }
-
-    @Test
-    void removeGroupShouldSucceededWhenRemoveStoredGroup() {
-        groupDAO.storeGroup(GROUP_A).block();
-        groupDAO.storeGroup(GROUP_B).block();
-        groupDAO.storeGroup(GROUP_B).block();
-
-        groupDAO.removeGroup(GROUP_A).block();
-
-        assertThat(groupDAO.retrieveAllGroups()
-                .collectList().block())
-            .containsOnly(GROUP_B);
     }
 }
