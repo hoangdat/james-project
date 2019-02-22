@@ -20,7 +20,11 @@
 package org.apache.james.mailbox.events;
 
 import static org.apache.james.mailbox.events.EventDeadLettersContract.EVENT_1;
+import static org.apache.james.mailbox.events.EventDeadLettersContract.EVENT_2;
+import static org.apache.james.mailbox.events.EventDeadLettersContract.EVENT_3;
 import static org.apache.james.mailbox.events.EventDeadLettersContract.EVENT_ID_1;
+import static org.apache.james.mailbox.events.EventDeadLettersContract.EVENT_ID_2;
+import static org.apache.james.mailbox.events.EventDeadLettersContract.EVENT_ID_3;
 import static org.apache.james.mailbox.events.EventDeadLettersContract.GROUP_A;
 import static org.apache.james.mailbox.events.EventDeadLettersContract.GROUP_B;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -69,12 +73,13 @@ class CassandraEventDeadLettersDAOTest {
 
     @Test
     void retrieveFailedEventShouldReturnStoredEvent() {
-        cassandraEventDeadLettersDAO.store(GROUP_B, EVENT_1).block();
+        cassandraEventDeadLettersDAO.store(GROUP_A, EVENT_1).block();
+        cassandraEventDeadLettersDAO.store(GROUP_B, EVENT_2).block();
 
         assertThat(cassandraEventDeadLettersDAO
-                .retrieveFailedEvent(GROUP_B, EVENT_ID_1)
+                .retrieveFailedEvent(GROUP_B, EVENT_ID_2)
                 .blockOptional().get())
-            .isEqualTo(EVENT_1);
+            .isEqualTo(EVENT_2);
     }
 
     @Test
@@ -88,11 +93,13 @@ class CassandraEventDeadLettersDAOTest {
     @Test
     void retrieveEventIdsWithGroupShouldReturnStoredEventId() {
         cassandraEventDeadLettersDAO.store(GROUP_B, EVENT_1).block();
+        cassandraEventDeadLettersDAO.store(GROUP_B, EVENT_2).block();
+        cassandraEventDeadLettersDAO.store(GROUP_B, EVENT_3).block();
 
         assertThat(cassandraEventDeadLettersDAO
                 .retrieveEventIdsWithGroup(GROUP_B)
                 .collectList().block())
-            .contains(EVENT_ID_1);
+            .containsOnly(EVENT_ID_1, EVENT_ID_2, EVENT_ID_3);
     }
 
     @Test
@@ -105,11 +112,13 @@ class CassandraEventDeadLettersDAOTest {
 
     @Test
     void retrieveAllGroupsShouldReturnStoredGroups() {
-        cassandraEventDeadLettersDAO.store(GROUP_B, EVENT_1).block();
+        cassandraEventDeadLettersDAO.store(GROUP_A, EVENT_1).block();
+        cassandraEventDeadLettersDAO.store(GROUP_B, EVENT_2).block();
+        cassandraEventDeadLettersDAO.store(GROUP_B, EVENT_3).block();
 
         assertThat(cassandraEventDeadLettersDAO
                 .retrieveAllGroups()
                 .collectList().block())
-            .contains(GROUP_B);
+            .containsOnly(GROUP_A, GROUP_B);
     }
 }
