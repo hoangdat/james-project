@@ -170,7 +170,7 @@ class DeletedMessageVaultHookTest {
     }
 
     @Test
-    void notifyDeleteShouldNotAppendMessageToVaultOfSharedUserOfMailboxWhenSharedUserDeleteMessageInSharingMailbox() throws Exception {
+    void notifyDeleteShouldNotAppendMessageToVaultOfOtherUserOfMailboxWhenSharedUserDeleteMessageInSharingMailbox() throws Exception {
         Mailbox aliceMailbox = testingData.createMailbox(MAILBOX_ALICE_ONE, aliceSession);
         MessageManager aliceMessageManager = testingData.createMessageManager(aliceMailbox, aliceSession);
         MessageManager bobMessageManager = testingData.createMessageManager(aliceMailbox, bobSession);
@@ -190,7 +190,7 @@ class DeletedMessageVaultHookTest {
     }
 
     @Test
-    void notifyDeleteShouldAppendMessageToVaultOfSharedUserOfMailboxWhenSharedUserDeleteMessageAfterMoveToAnotherMailbox() throws Exception {
+    void notifyDeleteShouldAppendMessageToVaultOfOtherUserOfMailboxWhenSharedUserDeleteMessageAfterMoveToAnotherMailbox() throws Exception {
         Mailbox aliceMailbox = testingData.createMailbox(MAILBOX_ALICE_ONE, aliceSession);
         Mailbox bobMailbox = testingData.createMailbox(MAILBOX_BOB_ONE, bobSession);
         MessageManager aliceMessageManager = testingData.createMessageManager(aliceMailbox, aliceSession);
@@ -239,7 +239,7 @@ class DeletedMessageVaultHookTest {
     }
 
     @Test
-    void notifyDeleteShouldAppendMessageToVaultOfSharedUserOfMailboxWhenSharedUserDeleteMessageAfterCopyToAnotherMailbox() throws Exception {
+    void notifyDeleteShouldAppendMessageToVaultOfOtherUserOfMailboxWhenOtherUserDeleteMessageAfterCopyToAnotherMailbox() throws Exception {
         Mailbox aliceMailbox = testingData.createMailbox(MAILBOX_ALICE_ONE, aliceSession);
         Mailbox bobMailbox = testingData.createMailbox(MAILBOX_BOB_ONE, bobSession);
         MessageManager aliceMessageManager = testingData.createMessageManager(aliceMailbox, aliceSession);
@@ -264,7 +264,7 @@ class DeletedMessageVaultHookTest {
     }
 
     @Test
-    void notifyDeleteShouldNotAppendMessageToVaultOfMailboxOwnerWhenSharedUserDeleteMessageAfterCopyToAnotherMailbox() throws Exception {
+    void notifyDeleteShouldNotAppendMessageToVaultOfMailboxOwnerWhenOtherUserDeleteMessageAfterCopyToAnotherMailbox() throws Exception {
         Mailbox aliceMailbox = testingData.createMailbox(MAILBOX_ALICE_ONE, aliceSession);
         Mailbox bobMailbox = testingData.createMailbox(MAILBOX_BOB_ONE, bobSession);
         MessageManager aliceMessageManager = testingData.createMessageManager(aliceMailbox, aliceSession);
