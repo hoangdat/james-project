@@ -20,9 +20,9 @@
 package org.apache.james.vault;
 
 import java.io.IOException;
-import java.time.Clock;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -53,13 +53,10 @@ class DeletedMessageConverter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DeletedMessageConverter.class);
 
-    private final Clock clock;
-
-    DeletedMessageConverter(Clock clock) {
-        this.clock = clock;
+    DeletedMessageConverter() {
     }
 
-    DeletedMessage convert(DeletedMessageVaultHook.DeletedMessageMailboxContext deletedMessageMailboxContext, org.apache.james.mailbox.store.mail.model.Message message) throws IOException {
+    DeletedMessage convert(DeletedMessageVaultHook.DeletedMessageMailboxContext deletedMessageMailboxContext, org.apache.james.mailbox.store.mail.model.Message message, ZonedDateTime deletionDate) throws IOException {
         Preconditions.checkNotNull(deletedMessageMailboxContext);
         Preconditions.checkNotNull(message);
 
@@ -70,10 +67,10 @@ class DeletedMessageConverter {
             .originMailboxes(deletedMessageMailboxContext.getOwnerMailboxes())
             .user(retrieveOwner(deletedMessageMailboxContext))
             .deliveryDate(retrieveDeliveryDate(mimeMessage, message))
-            .deletionDate(ZonedDateTime.ofInstant(clock.instant(), ZoneOffset.UTC))
+            .deletionDate(deletionDate)
             .sender(retrieveSender(mimeMessage))
             .recipients(retrieveRecipients(mimeMessage))
-            .hasAttachment(message.getAttachments().iterator().hasNext())
+            .hasAttachment(!message.getAttachments().isEmpty())
             .subject(mimeMessage.map(Message::getSubject))
             .build();
     }
@@ -112,7 +109,6 @@ class DeletedMessageConverter {
 
     private List<MailAddress> retrieveRecipients(Optional<Message> message) {
         return StreamUtils.flatten(combineRecipients(message)
-            .filter(Objects::nonNull)
             .map(AddressList::flatten)
             .flatMap(MailboxList::stream)
             .map(Mailbox::getAddress)
@@ -131,8 +127,9 @@ class DeletedMessageConverter {
 
     private Stream<AddressList> combineRecipients(Optional<Message> message) {
         return message.map(mimeMessage -> Stream.of(mimeMessage.getTo(),
-                mimeMessage.getCc(),
-                mimeMessage.getBcc()))
+                    mimeMessage.getCc(),
+                    mimeMessage.getBcc())
+                .filter(Objects::nonNull))
             .orElse(Stream.of());
     }
 }

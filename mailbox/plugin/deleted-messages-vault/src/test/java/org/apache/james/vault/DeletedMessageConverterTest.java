@@ -35,8 +35,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Clock;
-import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
@@ -102,14 +100,13 @@ class DeletedMessageConverterTest {
 
     @BeforeEach
     void setUp() {
-        Clock clock = Clock.fixed(DELETION_DATE.toInstant(), ZoneOffset.UTC);
-        deletedMessageConverter = new DeletedMessageConverter(clock);
+        deletedMessageConverter = new DeletedMessageConverter();
     }
 
     @Test
     void convertShouldThrowWhenNoOwner() {
         DeletedMessageVaultHook.DeletedMessageMailboxContext deletedMessageMailboxContext = new DeletedMessageVaultHook.DeletedMessageMailboxContext(MESSAGE_ID, EMPTY_OWNER, ORIGIN_MAILBOXES);
-        assertThatThrownBy(() -> deletedMessageConverter.convert(deletedMessageMailboxContext, buildMessage(getMessageBuilder(), ATTACHMENTS)))
+        assertThatThrownBy(() -> deletedMessageConverter.convert(deletedMessageMailboxContext, buildMessage(getMessageBuilder(), ATTACHMENTS), DELETION_DATE))
             .isInstanceOf(NullPointerException.class);
     }
 
@@ -118,7 +115,7 @@ class DeletedMessageConverterTest {
         MessageBuilder builder = getMessageBuilder();
         builder.headers.remove(DATE_FIELD);
 
-        assertThat(deletedMessageConverter.convert(DELETED_MESSAGE_MAILBOX_CONTEXT, buildMessage(builder, NO_ATTACHMENT)))
+        assertThat(deletedMessageConverter.convert(DELETED_MESSAGE_MAILBOX_CONTEXT, buildMessage(builder, NO_ATTACHMENT), DELETION_DATE))
             .isEqualTo(DELETED_MESSAGE_WITH_SUBJECT);
     }
 
@@ -127,7 +124,7 @@ class DeletedMessageConverterTest {
         MessageBuilder builder = getMessageBuilder();
         builder.headers.remove(SUBJECT_FIELD);
 
-        assertThat(deletedMessageConverter.convert(DELETED_MESSAGE_MAILBOX_CONTEXT, buildMessage(builder, NO_ATTACHMENT)))
+        assertThat(deletedMessageConverter.convert(DELETED_MESSAGE_MAILBOX_CONTEXT, buildMessage(builder, NO_ATTACHMENT), DELETION_DATE))
             .isEqualTo(DELETED_MESSAGE);
     }
 
@@ -135,7 +132,7 @@ class DeletedMessageConverterTest {
     void convertShouldReturnCorrespondingDeletedMessage() throws Exception {
         MessageBuilder builder = getMessageBuilder();
 
-        assertThat(deletedMessageConverter.convert(DELETED_MESSAGE_MAILBOX_CONTEXT, buildMessage(builder, NO_ATTACHMENT)))
+        assertThat(deletedMessageConverter.convert(DELETED_MESSAGE_MAILBOX_CONTEXT, buildMessage(builder, NO_ATTACHMENT), DELETION_DATE))
             .isEqualTo(DELETED_MESSAGE_WITH_SUBJECT);
     }
 
@@ -145,7 +142,7 @@ class DeletedMessageConverterTest {
         builder.headers.remove(TO_FIELD);
         builder.headers.remove(CC_FIELD);
 
-        DeletedMessage deletedMessage = deletedMessageConverter.convert(DELETED_MESSAGE_MAILBOX_CONTEXT, buildMessage(builder, NO_ATTACHMENT));
+        DeletedMessage deletedMessage = deletedMessageConverter.convert(DELETED_MESSAGE_MAILBOX_CONTEXT, buildMessage(builder, NO_ATTACHMENT), DELETION_DATE);
 
         assertThat(deletedMessage.getRecipients())
             .isEmpty();
@@ -157,7 +154,7 @@ class DeletedMessageConverterTest {
         builder.header(TO_FIELD, "bad@bad@bad");
         builder.header(CC_FIELD, "dad@");
 
-        DeletedMessage deletedMessage = deletedMessageConverter.convert(DELETED_MESSAGE_MAILBOX_CONTEXT, buildMessage(builder, NO_ATTACHMENT));
+        DeletedMessage deletedMessage = deletedMessageConverter.convert(DELETED_MESSAGE_MAILBOX_CONTEXT, buildMessage(builder, NO_ATTACHMENT), DELETION_DATE);
         assertThat(deletedMessage.getRecipients())
             .isEmpty();
     }
@@ -167,7 +164,7 @@ class DeletedMessageConverterTest {
         MessageBuilder builder = getMessageBuilder();
         builder.header(TO_FIELD, "bad@bad@bad");
 
-        DeletedMessage deletedMessage = deletedMessageConverter.convert(DELETED_MESSAGE_MAILBOX_CONTEXT, buildMessage(builder, NO_ATTACHMENT));
+        DeletedMessage deletedMessage = deletedMessageConverter.convert(DELETED_MESSAGE_MAILBOX_CONTEXT, buildMessage(builder, NO_ATTACHMENT), DELETION_DATE);
         assertThat(deletedMessage.getRecipients())
             .containsOnly(RECIPIENT2);
     }
@@ -177,7 +174,7 @@ class DeletedMessageConverterTest {
         MessageBuilder builder = getMessageBuilder();
         builder.headers.remove(SENDER_FIELD);
 
-        DeletedMessage deletedMessage = deletedMessageConverter.convert(DELETED_MESSAGE_MAILBOX_CONTEXT, buildMessage(builder, NO_ATTACHMENT));
+        DeletedMessage deletedMessage = deletedMessageConverter.convert(DELETED_MESSAGE_MAILBOX_CONTEXT, buildMessage(builder, NO_ATTACHMENT), DELETION_DATE);
 
         assertThat(deletedMessage.getSender())
             .isEqualTo(MaybeSender.nullSender());

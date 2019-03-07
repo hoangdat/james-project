@@ -19,6 +19,9 @@
 
 package org.apache.james.vault;
 
+import java.time.Clock;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -104,15 +107,18 @@ public class DeletedMessageVaultHook implements PreDeletionHook {
     private final DeletedMessageVault deletedMessageVault;
     private final DeletedMessageConverter deletedMessageConverter;
     private final MailboxSessionMapperFactory mapperFactory;
+    private final Clock clock;
 
     DeletedMessageVaultHook(SessionProvider sessionProvider,
                             DeletedMessageVault deletedMessageVault,
                             DeletedMessageConverter deletedMessageConverter,
-                            MailboxSessionMapperFactory mapperFactory) {
+                            MailboxSessionMapperFactory mapperFactory,
+                            Clock clock) {
         this.session = sessionProvider.createSystemSession(getClass().getName());
         this.deletedMessageVault = deletedMessageVault;
         this.deletedMessageConverter = deletedMessageConverter;
         this.mapperFactory = mapperFactory;
+        this.clock = clock;
     }
 
     @Override
@@ -130,7 +136,8 @@ public class DeletedMessageVaultHook implements PreDeletionHook {
             .findFirst();
 
         return maybeMailboxMessage.map(Throwing.function(mailboxMessage -> Pair.of(mailboxMessage,
-                deletedMessageConverter.convert(deletedMessageMailboxContext, mailboxMessage))))
+                deletedMessageConverter.convert(deletedMessageMailboxContext, mailboxMessage,
+                    ZonedDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)))))
             .map(Throwing.function(pairs -> Mono.from(deletedMessageVault
                 .append(pairs.getRight().getOwner(), pairs.getRight(), pairs.getLeft().getFullContent()))))
             .orElse(Mono.empty());
@@ -140,8 +147,8 @@ public class DeletedMessageVaultHook implements PreDeletionHook {
         return Flux.fromIterable(deleteOperation.getDeletionMetadataList())
             .groupBy(MetadataWithMailboxId::getMailboxId)
             .flatMap(Throwing.function(this::addOwnerToMetadata).sneakyThrow())
-            .groupBy(this::createGroupingKeyMapper)
-            .flatMap(this::reduceMailboxContexts);
+            .groupBy(this::toMessageIdUserPair)
+            .flatMap(groupFlux -> groupFlux.reduce(DeletedMessageMailboxContext::combine));
     }
 
     private Publisher<DeletedMessageMailboxContext> addOwnerToMetadata(GroupedFlux<MailboxId, MetadataWithMailboxId> groupedFlux) throws MailboxException {
@@ -149,11 +156,7 @@ public class DeletedMessageVaultHook implements PreDeletionHook {
         return groupedFlux.map(metadata -> new DeletedMessageMailboxContext(metadata.getMessageMetaData().getMessageId(), owner, ImmutableList.of(metadata.getMailboxId())));
     }
 
-    private Publisher<DeletedMessageMailboxContext> reduceMailboxContexts(GroupedFlux<Pair<MessageId, User>, DeletedMessageMailboxContext> groupedFlux) {
-        return groupedFlux.reduce(DeletedMessageMailboxContext::combine);
-    }
-
-    private Pair<MessageId, User> createGroupingKeyMapper(DeletedMessageMailboxContext deletedMessageMetadata) {
+    private Pair<MessageId, User> toMessageIdUserPair(DeletedMessageMailboxContext deletedMessageMetadata) {
         return Pair.of(deletedMessageMetadata.getMessageId(), deletedMessageMetadata.getOwner());
     }
 
