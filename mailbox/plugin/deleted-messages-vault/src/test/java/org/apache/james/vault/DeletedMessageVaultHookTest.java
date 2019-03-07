@@ -27,7 +27,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import java.util.List;
 
 import org.apache.james.core.MailAddress;
