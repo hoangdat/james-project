@@ -53,9 +53,6 @@ class DeletedMessageConverter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DeletedMessageConverter.class);
 
-    DeletedMessageConverter() {
-    }
-
     DeletedMessage convert(DeletedMessageVaultHook.DeletedMessageMailboxContext deletedMessageMailboxContext, org.apache.james.mailbox.store.mail.model.Message message, ZonedDateTime deletionDate) throws IOException {
         Preconditions.checkNotNull(deletedMessageMailboxContext);
         Preconditions.checkNotNull(message);
