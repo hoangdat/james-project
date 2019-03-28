@@ -25,9 +25,6 @@ import org.apache.james.mailbox.MailboxSession;
 import org.apache.james.mailbox.events.EventBus;
 import org.apache.james.mailbox.exception.MailboxException;
 import org.apache.james.mailbox.jpa.mail.JPAMailboxMapper;
-import org.apache.james.mailbox.jpa.mail.model.JPAMailbox;
-import org.apache.james.mailbox.model.Mailbox;
-import org.apache.james.mailbox.model.MailboxPath;
 import org.apache.james.mailbox.model.MessageId;
 import org.apache.james.mailbox.store.MailboxManagerConfiguration;
 import org.apache.james.mailbox.store.PreDeletionHooks;
@@ -64,11 +61,6 @@ public abstract class JPAMailboxManager extends StoreMailboxManager {
             messageParser, messageIdFactory, annotationManager,
             eventBus, storeRightManager, quotaComponents,
             index, MailboxManagerConfiguration.DEFAULT, PreDeletionHooks.NO_PRE_DELETION_HOOK);
-    }
-    
-    @Override
-    protected Mailbox doCreateMailbox(MailboxPath path, MailboxSession session) {
-        return  new JPAMailbox(path, randomUidValidity());
     }
 
     @Override

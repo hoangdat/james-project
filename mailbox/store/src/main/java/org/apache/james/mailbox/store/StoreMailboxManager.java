@@ -40,7 +40,6 @@ import org.apache.james.mailbox.MailboxPathLocker.LockAwareExecution;
 import org.apache.james.mailbox.MailboxSession;
 import org.apache.james.mailbox.MessageManager;
 import org.apache.james.mailbox.MetadataWithMailboxId;
-import org.apache.james.mailbox.SimpleMailbox;
 import org.apache.james.mailbox.StandardMailboxMetaDataComparator;
 import org.apache.james.mailbox.events.EventBus;
 import org.apache.james.mailbox.events.MailboxIdRegistrationKey;
@@ -265,17 +264,8 @@ public class StoreMailboxManager implements MailboxManager {
             getStoreRightManager(), preDeletionHooks);
     }
 
-    /**
-     * Create a Mailbox for the given mailbox path. This will by default return a {@link SimpleMailbox}.
-     * <p/>
-     * If you need to return something more special just override this method
-     *
-     * @param mailboxPath
-     * @param session
-     * @throws MailboxException
-     */
-    protected Mailbox doCreateMailbox(MailboxPath mailboxPath, MailboxSession session) throws MailboxException {
-        return new SimpleMailbox(mailboxPath, randomUidValidity());
+    private Mailbox doCreateMailbox(MailboxPath mailboxPath) {
+        return new Mailbox(mailboxPath, randomUidValidity());
     }
 
     @Override
@@ -349,7 +339,7 @@ public class StoreMailboxManager implements MailboxManager {
             for (MailboxPath mailbox : sanitizedMailboxPath.getHierarchyLevels(getDelimiter())) {
                 locker.executeWithLock(mailboxSession, mailbox, (LockAwareExecution<Void>) () -> {
                     if (!mailboxExists(mailbox, mailboxSession)) {
-                        Mailbox m = doCreateMailbox(mailbox, mailboxSession);
+                        Mailbox m = doCreateMailbox(mailbox);
                         MailboxMapper mapper = mailboxSessionMapperFactory.getMailboxMapper(mailboxSession);
                         try {
                             mapper.execute(Mapper.toTransaction(() -> mailboxIds.add(mapper.save(m))));
@@ -410,7 +400,7 @@ public class StoreMailboxManager implements MailboxManager {
 
             // We need to create a copy of the mailbox as maybe we can not refer to the real
             // mailbox once we remove it
-            SimpleMailbox m = new SimpleMailbox(mailbox);
+            Mailbox m = new Mailbox(mailbox);
             mailboxMapper.delete(mailbox);
             eventBus.dispatch(EventFactory.mailboxDeleted()
                 .randomEventId()

@@ -1172,7 +1172,7 @@ public abstract class MailboxManagerTest<T extends MailboxManager> {
     }
 
     @Nested
-    class BasicFeaturesTests {
+    public class BasicFeaturesTests {
         @Test
         void user1ShouldNotHaveAnInbox() throws Exception {
             session = mailboxManager.createSystemSession(USER_1);
@@ -1191,6 +1191,20 @@ public abstract class MailboxManagerTest<T extends MailboxManager> {
             mailboxManager.createMailbox(inbox, session);
 
             assertThat(mailboxManager.mailboxExists(inbox, session)).isTrue();
+        }
+
+        @Test
+        void renameMailboxShouldChangeTheMailboxPathOfAMailbox() throws Exception {
+            MailboxSession session = mailboxManager.createSystemSession(USER_1);
+
+            MailboxPath mailboxPath1 = MailboxPath.forUser(USER_1, "mbx1");
+            MailboxPath mailboxPath2 = MailboxPath.forUser(USER_1, "mbx2");
+            Optional<MailboxId> mailboxId = mailboxManager.createMailbox(mailboxPath1, session);
+
+            mailboxManager.renameMailbox(mailboxPath1, mailboxPath2, session);
+
+            assertThat(mailboxManager.getMailbox(mailboxId.get(), session).getMailboxPath())
+                .isEqualTo(mailboxPath2);
         }
 
         @Test
