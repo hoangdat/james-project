@@ -40,6 +40,7 @@ import org.apache.james.task.TaskId;
 import org.apache.james.task.TaskManager;
 import org.apache.james.user.api.UsersRepository;
 import org.apache.james.user.api.UsersRepositoryException;
+import org.apache.james.vault.DeletedMessageVault;
 import org.apache.james.vault.search.Query;
 import org.apache.james.webadmin.Constants;
 import org.apache.james.webadmin.Routes;
@@ -56,6 +57,7 @@ import com.github.steveash.guavate.Guavate;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
@@ -63,6 +65,7 @@ import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import spark.HaltException;
 import spark.Request;
 import spark.Response;
 import spark.Service;
@@ -72,11 +75,12 @@ import spark.Service;
 @Produces(Constants.JSON_CONTENT_TYPE)
 public class DeletedMessagesVaultRoutes implements Routes {
 
-    enum UserVaultAction {
+    enum VaultAction {
         RESTORE("restore"),
-        EXPORT("export");
+        EXPORT("export"),
+        PURGE("purge");
 
-        static Optional<UserVaultAction> getAction(String value) {
+        static Optional<VaultAction> getAction(String value) {
             Preconditions.checkNotNull(value, "action cannot be null");
             Preconditions.checkArgument(StringUtils.isNotBlank(value), "action cannot be empty or blank");
 
@@ -85,15 +89,16 @@ public class DeletedMessagesVaultRoutes implements Routes {
                 .findFirst();
         }
 
-        private static List<String> plainValues() {
+        @VisibleForTesting
+        static List<String> plainValues() {
             return Stream.of(values())
-                .map(UserVaultAction::getValue)
+                .map(VaultAction::getValue)
                 .collect(Guavate.toImmutableList());
         }
 
         private final String value;
 
-        UserVaultAction(String value) {
+        VaultAction(String value) {
             this.value = value;
         }
 
@@ -102,14 +107,17 @@ public class DeletedMessagesVaultRoutes implements Routes {
         }
     }
 
-    public static final String ROOT_PATH = "deletedMessages/users";
+    public static final String ROOT_PATH = "deletedMessages";
+    public static final String USERS = "users";
+    public static final String USER_PATH = ROOT_PATH + SEPARATOR + USERS;
     private static final String USER_PATH_PARAM = "user";
-    private static final String RESTORE_PATH = ROOT_PATH + SEPARATOR + ":" + USER_PATH_PARAM;
+    private static final String RESTORE_PATH = USER_PATH + SEPARATOR + ":" + USER_PATH_PARAM;
     private static final String ACTION_QUERY_PARAM = "action";
     private static final String EXPORT_TO_QUERY_PARAM = "exportTo";
 
     private final RestoreService vaultRestore;
     private final ExportService vaultExport;
+    private final DeletedMessageVault deletedMessageVault;
     private final JsonTransformer jsonTransformer;
     private final TaskManager taskManager;
     private final JsonExtractor<QueryElement> jsonExtractor;
@@ -118,8 +126,9 @@ public class DeletedMessagesVaultRoutes implements Routes {
 
     @Inject
     @VisibleForTesting
-    DeletedMessagesVaultRoutes(RestoreService vaultRestore, ExportService vaultExport, JsonTransformer jsonTransformer,
+    DeletedMessagesVaultRoutes(DeletedMessageVault deletedMessageVault, RestoreService vaultRestore, ExportService vaultExport, JsonTransformer jsonTransformer,
                                TaskManager taskManager, QueryTranslator queryTranslator, UsersRepository usersRepository) {
+        this.deletedMessageVault = deletedMessageVault;
         this.vaultRestore = vaultRestore;
         this.vaultExport = vaultExport;
         this.jsonTransformer = jsonTransformer;
@@ -137,10 +146,11 @@ public class DeletedMessagesVaultRoutes implements Routes {
     @Override
     public void define(Service service) {
         service.post(RESTORE_PATH, this::userActions, jsonTransformer);
+        service.post(ROOT_PATH, this::globalActions, jsonTransformer);
     }
 
     @POST
-    @Path(ROOT_PATH)
+    @Path(USER_PATH)
     @ApiOperation(value = "Restore deleted emails from a specified user to his new restore mailbox")
     @ApiImplicitParams({
         @ApiImplicitParam(
@@ -173,14 +183,43 @@ public class DeletedMessagesVaultRoutes implements Routes {
         @ApiResponse(code = HttpStatus.INTERNAL_SERVER_ERROR_500, message = "Internal server error - Something went bad on the server side.")
     })
     private TaskIdDto userActions(Request request, Response response) throws JsonExtractException {
-        UserVaultAction requestedAction = extractUserVaultAction(request);
+        VaultAction requestedAction = extractVaultAction(request);
+        validateAction(requestedAction, ImmutableList.of(VaultAction.RESTORE, VaultAction.EXPORT));
 
-        Task requestedTask = generateTask(requestedAction, request);
+        Task requestedTask = generateUserTask(requestedAction, request);
         TaskId taskId = taskManager.submit(requestedTask);
         return TaskIdDto.respond(response, taskId);
     }
 
-    private Task generateTask(UserVaultAction requestedAction, Request request) throws JsonExtractException {
+    @POST
+    @Path(ROOT_PATH)
+    @ApiOperation(value = "Purge all expired messages based on retentionPeriod of deletedMessageVault configuration")
+    @ApiImplicitParams({
+        @ApiImplicitParam(
+            required = true,
+            name = "action",
+            dataType = "String",
+            paramType = "query",
+            example = "?action=purge",
+            value = "Compulsory. Needs to be a purge action")
+    })
+    @ApiResponses(value = {
+        @ApiResponse(code = HttpStatus.CREATED_201, message = "Task is created", response = TaskIdDto.class),
+        @ApiResponse(code = HttpStatus.BAD_REQUEST_400, message = "Bad request - action is invalid"),
+        @ApiResponse(code = HttpStatus.INTERNAL_SERVER_ERROR_500, message = "Internal server error - Something went bad on the server side.")
+    })
+    private TaskIdDto globalActions(Request request, Response response) {
+        Task vaultTask = generateVaultTask(request);
+        TaskId taskId = taskManager.submit(vaultTask);
+        return TaskIdDto.respond(response, taskId);
+    }
+
+    private Task generateVaultTask(Request request) {
+        validateAction(request, ImmutableList.of(VaultAction.PURGE));
+        return deletedMessageVault.deleteExpiredMessagesTask();
+    }
+
+    private Task generateUserTask(VaultAction requestedAction, Request request) throws JsonExtractException {
         User user = extractUser(request);
         validateUserExist(user);
         Query query = translate(jsonExtractor.parse(request.body()));
@@ -264,17 +303,41 @@ public class DeletedMessagesVaultRoutes implements Routes {
         }
     }
 
-    private UserVaultAction extractUserVaultAction(Request request) {
+    private VaultAction extractVaultAction(Request request) {
         String actionParam = request.queryParams(ACTION_QUERY_PARAM);
         return Optional.ofNullable(actionParam)
-            .map(this::getUserVaultAction)
+            .map(this::getVaultAction)
             .orElseThrow(() -> new IllegalArgumentException("action parameter is missing"));
     }
 
-    private UserVaultAction getUserVaultAction(String actionString) {
-        return UserVaultAction.getAction(actionString)
+    private VaultAction getVaultAction(String actionString) {
+        return VaultAction.getAction(actionString)
             .orElseThrow(() -> new IllegalArgumentException(String.format("'%s' is not a valid action. Supported values are: (%s)",
                 actionString,
-                Joiner.on(",").join(UserVaultAction.plainValues()))));
+                Joiner.on(",").join(VaultAction.plainValues()))));
+    }
+
+    private void validateAction(VaultAction requestedAction, List<VaultAction> validateActions) {
+        validateActions.stream()
+            .filter(action -> action.equals(requestedAction))
+            .findFirst()
+            .orElseThrow(() -> throwNotSupportedAction(requestedAction, validateActions));
+    }
+
+    private void validateAction(Request request, List<VaultAction> validateActions) {
+        VaultAction requestedAction = extractVaultAction(request);
+        validateAction(requestedAction, validateActions);
+    }
+
+    private HaltException throwNotSupportedAction(VaultAction requestAction, List<VaultAction> validateActions) {
+        return ErrorResponder.builder()
+            .statusCode(HttpStatus.BAD_REQUEST_400)
+            .type(ErrorResponder.ErrorType.INVALID_ARGUMENT)
+            .message(String.format("'%s' is not a valid action. Supported values are: (%s)",
+                requestAction.getValue(),
+                Joiner.on(",").join(validateActions.stream()
+                    .map(VaultAction::getValue)
+                    .collect(ImmutableList.toImmutableList()))))
+            .haltError();
     }
 }

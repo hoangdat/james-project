@@ -2643,6 +2643,7 @@ Here are the following actions available on the 'Deleted Messages Vault'
 
  - [Restore Deleted Messages](#Restore_deleted_messages)
  - [Export Deleted Messages](#Export_deleted_messages)
+ - [Purge Deleted Messages](#Purge_deleted_messages)
 
  Note that the 'Deleted Messages Vault' feature is only supported on top of Cassandra-Guice.
 
@@ -2816,6 +2817,29 @@ while:
  - userExportFrom: export deleted messages from this user
  - exportTo: content of deleted messages have been shared to this mail address
  - totalExportedMessages: number of deleted messages match with json query, then being shared to sharee
+ 
+### Purge Deleted Messages
+ 
+First, you need to configure 'retentionPeriod' in deletedMessageVault.
+
+Delete all expired deleted messages with 'retentionPeriod' configured.
+
+```
+curl -XPOST http://ip:port/deletedMessages?action=purge
+```
+
+Response code:
+
+ - 201: Task for purging has been created
+ - 400: Bad request: 
+   - action query param is not present
+   - action query param is not a valid action
+
+You need to create a CRON job to call this endpoint in a regular basis. Example:
+
+```
+0 0 * * * /usr/bin/curl --request POST http://ip:port/deletedMessages?action=purge >/dev/null 2>&1
+```
 
 ## Task management
 
