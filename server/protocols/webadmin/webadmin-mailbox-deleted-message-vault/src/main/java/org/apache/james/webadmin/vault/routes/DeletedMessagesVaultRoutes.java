@@ -40,6 +40,7 @@ import org.apache.james.task.TaskId;
 import org.apache.james.task.TaskManager;
 import org.apache.james.user.api.UsersRepository;
 import org.apache.james.user.api.UsersRepositoryException;
+import org.apache.james.vault.DeletedMessageVault;
 import org.apache.james.vault.search.Query;
 import org.apache.james.webadmin.Constants;
 import org.apache.james.webadmin.Routes;
@@ -86,7 +87,8 @@ public class DeletedMessagesVaultRoutes implements Routes {
                 .findFirst();
         }
 
-        private static List<String> plainValues() {
+        @VisibleForTesting
+        static List<String> plainValues() {
             return Stream.of(values())
                 .map(VaultAction::getValue)
                 .collect(Guavate.toImmutableList());
@@ -113,7 +115,7 @@ public class DeletedMessagesVaultRoutes implements Routes {
 
     private final RestoreService vaultRestore;
     private final ExportService vaultExport;
-    private final PurgeService vaultPurge;
+    private final DeletedMessageVault deletedMessageVault;
     private final JsonTransformer jsonTransformer;
     private final TaskManager taskManager;
     private final JsonExtractor<QueryElement> jsonExtractor;
@@ -122,11 +124,11 @@ public class DeletedMessagesVaultRoutes implements Routes {
 
     @Inject
     @VisibleForTesting
-    DeletedMessagesVaultRoutes(RestoreService vaultRestore, ExportService vaultExport, PurgeService vaultPurge, JsonTransformer jsonTransformer,
+    DeletedMessagesVaultRoutes(DeletedMessageVault deletedMessageVault, RestoreService vaultRestore, ExportService vaultExport, JsonTransformer jsonTransformer,
                                TaskManager taskManager, QueryTranslator queryTranslator, UsersRepository usersRepository) {
+        this.deletedMessageVault = deletedMessageVault;
         this.vaultRestore = vaultRestore;
         this.vaultExport = vaultExport;
-        this.vaultPurge = vaultPurge;
         this.jsonTransformer = jsonTransformer;
         this.taskManager = taskManager;
         this.queryTranslator = queryTranslator;
@@ -204,10 +206,9 @@ public class DeletedMessagesVaultRoutes implements Routes {
         @ApiResponse(code = HttpStatus.INTERNAL_SERVER_ERROR_500, message = "Internal server error - Something went bad on the server side.")
     })
     private TaskIdDto purgeActions(Request request, Response response) {
-        VaultAction requestedAction = extractVaultAction(request);
-        Preconditions.checkArgument(requestedAction.equals(VaultAction.PURGE));
+        validatePurgeAction(request);
 
-        Task purgeTask = vaultPurge.purge();
+        Task purgeTask = deletedMessageVault.deleteExpiredMessagesTask();
         TaskId taskId = taskManager.submit(purgeTask);
         return TaskIdDto.respond(response, taskId);
     }
@@ -308,5 +309,16 @@ public class DeletedMessagesVaultRoutes implements Routes {
             .orElseThrow(() -> new IllegalArgumentException(String.format("'%s' is not a valid action. Supported values are: (%s)",
                 actionString,
                 Joiner.on(",").join(VaultAction.plainValues()))));
+    }
+
+    private void validatePurgeAction(Request request) {
+        VaultAction requestedAction = extractVaultAction(request);
+        if (requestedAction != VaultAction.PURGE) {
+            throw ErrorResponder.builder()
+                .statusCode(HttpStatus.BAD_REQUEST_400)
+                .type(ErrorResponder.ErrorType.INVALID_ARGUMENT)
+                .message("Not 'purge' action")
+                .haltError();
+        }
     }
 }

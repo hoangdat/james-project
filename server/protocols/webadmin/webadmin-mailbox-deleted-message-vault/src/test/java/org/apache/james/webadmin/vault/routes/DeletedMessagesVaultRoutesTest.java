@@ -119,6 +119,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 
 import io.restassured.RestAssured;
@@ -161,7 +162,6 @@ class DeletedMessagesVaultRoutesTest {
     @BeforeEach
     void beforeEach() throws Exception {
         clock = Clock.systemUTC();
-//        MemoryDeletedMessagesVault spied = spy(new MemoryDeletedMessagesVault(RetentionConfiguration.DEFAULT, clock));
         vault = spy(new MemoryDeletedMessagesVault(RetentionConfiguration.DEFAULT, clock));
         InMemoryIntegrationResources inMemoryResource = InMemoryIntegrationResources.defaultResources();
         mailboxManager = spy(inMemoryResource.getMailboxManager());
@@ -175,13 +175,12 @@ class DeletedMessagesVaultRoutesTest {
         blobStore = new MemoryBlobStore(blobIdFactory);
         zipper = new DeletedMessageZipper();
         exportService = new ExportService(blobExporting, blobStore, zipper, vault);
-        PurgeService purgeService = new PurgeService(vault);
         QueryTranslator queryTranslator = new QueryTranslator(new InMemoryId.Factory());
         usersRepository = createUsersRepository();
         webAdminServer = WebAdminUtils.createWebAdminServer(
             new DefaultMetricFactory(),
             new TasksRoutes(taskManager, jsonTransformer),
-            new DeletedMessagesVaultRoutes(vaultRestore, exportService, purgeService, jsonTransformer, taskManager, queryTranslator, usersRepository));
+            new DeletedMessagesVaultRoutes(vault, vaultRestore, exportService, jsonTransformer, taskManager, queryTranslator, usersRepository));
 
         webAdminServer.configure(NO_CONFIGURATION);
         webAdminServer.await();
@@ -279,8 +278,8 @@ class DeletedMessagesVaultRoutesTest {
                 .statusCode(HttpStatus.BAD_REQUEST_400)
                 .body("statusCode", is(400))
                 .body("type", is(ErrorResponder.ErrorType.INVALID_ARGUMENT.getType()))
-                .body("message", is(notNullValue()))
-                .body("details", is(notNullValue()));
+                .body("message", is("Invalid arguments supplied in the user request"))
+                .body("details", is("action parameter is missing"));
         }
 
         @Test
@@ -293,8 +292,8 @@ class DeletedMessagesVaultRoutesTest {
                 .statusCode(HttpStatus.BAD_REQUEST_400)
                 .body("statusCode", is(400))
                 .body("type", is(ErrorResponder.ErrorType.INVALID_ARGUMENT.getType()))
-                .body("message", is(notNullValue()))
-                .body("details", is(notNullValue()));
+                .body("message", is("Invalid arguments supplied in the user request"))
+                .body("details", is("action cannot be empty or blank"));
         }
 
         @Test
@@ -307,8 +306,9 @@ class DeletedMessagesVaultRoutesTest {
                 .statusCode(HttpStatus.BAD_REQUEST_400)
                 .body("statusCode", is(400))
                 .body("type", is(ErrorResponder.ErrorType.INVALID_ARGUMENT.getType()))
-                .body("message", is(notNullValue()))
-                .body("details", is(notNullValue()));
+                .body("message", is("Invalid arguments supplied in the user request"))
+                .body("details", is(String.format("'invalid action' is not a valid action. Supported values are: (%s)",
+                    Joiner.on(",").join(DeletedMessagesVaultRoutes.VaultAction.plainValues()))));
         }
 
         @Test
@@ -321,8 +321,9 @@ class DeletedMessagesVaultRoutesTest {
                 .statusCode(HttpStatus.BAD_REQUEST_400)
                 .body("statusCode", is(400))
                 .body("type", is(ErrorResponder.ErrorType.INVALID_ARGUMENT.getType()))
-                .body("message", is(notNullValue()))
-                .body("details", is(notNullValue()));
+                .body("message", is("Invalid arguments supplied in the user request"))
+                .body("details", is(String.format("'PURGE' is not a valid action. Supported values are: (%s)",
+                    Joiner.on(",").join(DeletedMessagesVaultRoutes.VaultAction.plainValues()))));
         }
 
         @ParameterizedTest
@@ -1964,16 +1965,18 @@ class DeletedMessagesVaultRoutesTest {
         }
 
         @Test
-        void purgeShouldNotDeleteNotExpiredMessagesInTheVault() throws Exception {
-            MailboxSession session = mailboxManager.createSystemSession(USER.asString());
-            MailboxPath restoreMailboxPath = MailboxPath.forUser(USER.asString(), RESTORE_MAILBOX_NAME);
-            mailboxManager.createMailbox(restoreMailboxPath, session);
-            MessageManager messageManager = mailboxManager.getMailbox(restoreMailboxPath, session);
-            messageManager.appendMessage(
-                MessageManager.AppendCommand.builder().build(new ByteArrayInputStream(CONTENT)),
-                session);
-
-            DeletedMessage notExpiredMessage = generateNoExpiredDeletedMessage();
+        void purgeShouldNotDeleteNotExpiredMessagesInTheVault() {
+            DeletedMessage notExpiredMessage = DeletedMessage.builder()
+                .messageId(InMemoryMessageId.of(46))
+                .originMailboxes(MAILBOX_ID_1, MAILBOX_ID_2)
+                .user(USER)
+                .deliveryDate(DELIVERY_DATE)
+                .deletionDate(ZonedDateTime.ofInstant(clock.instant(), ZoneOffset.UTC))
+                .sender(MaybeSender.of(SENDER))
+                .recipients(RECIPIENT1, RECIPIENT3)
+                .hasAttachment(false)
+                .size(CONTENT.length)
+                .build();
 
             vault.append(USER, DELETED_MESSAGE, new ByteArrayInputStream(CONTENT)).block();
             vault.append(USER, DELETED_MESSAGE_2, new ByteArrayInputStream(CONTENT)).block();
@@ -2015,9 +2018,7 @@ class DeletedMessagesVaultRoutesTest {
             given()
                 .basePath(TasksRoutes.BASE)
             .when()
-                .get(taskId + "/await")
-            .then()
-                .body("status", is("completed"));
+                .get(taskId + "/await");
 
             assertThat(hasAnyMail(USER))
                 .isFalse();
@@ -2142,19 +2143,5 @@ class DeletedMessagesVaultRoutesTest {
         Mono.from(vault.append(USER, deletedMessage, new ByteArrayInputStream(CONTENT)))
             .block();
         return deletedMessage;
-    }
-
-    private DeletedMessage generateNoExpiredDeletedMessage() {
-        return DeletedMessage.builder()
-            .messageId(InMemoryMessageId.of(46))
-            .originMailboxes(MAILBOX_ID_1, MAILBOX_ID_2)
-            .user(USER)
-            .deliveryDate(DELIVERY_DATE)
-            .deletionDate(ZonedDateTime.ofInstant(clock.instant(), ZoneOffset.UTC))
-            .sender(MaybeSender.of(SENDER))
-            .recipients(RECIPIENT1, RECIPIENT3)
-            .hasAttachment(false)
-            .size(CONTENT.length)
-            .build();
     }
 }
