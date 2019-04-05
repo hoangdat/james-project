@@ -74,7 +74,8 @@ public class DeletedMessagesVaultRoutes implements Routes {
 
     enum VaultAction {
         RESTORE("restore"),
-        EXPORT("export");
+        EXPORT("export"),
+        PURGE("purge");
 
         static Optional<VaultAction> getAction(String value) {
             Preconditions.checkNotNull(value, "action cannot be null");
@@ -112,6 +113,7 @@ public class DeletedMessagesVaultRoutes implements Routes {
 
     private final RestoreService vaultRestore;
     private final ExportService vaultExport;
+    private final PurgeService vaultPurge;
     private final JsonTransformer jsonTransformer;
     private final TaskManager taskManager;
     private final JsonExtractor<QueryElement> jsonExtractor;
@@ -120,10 +122,11 @@ public class DeletedMessagesVaultRoutes implements Routes {
 
     @Inject
     @VisibleForTesting
-    DeletedMessagesVaultRoutes(RestoreService vaultRestore, ExportService vaultExport, JsonTransformer jsonTransformer,
+    DeletedMessagesVaultRoutes(RestoreService vaultRestore, ExportService vaultExport, PurgeService vaultPurge, JsonTransformer jsonTransformer,
                                TaskManager taskManager, QueryTranslator queryTranslator, UsersRepository usersRepository) {
         this.vaultRestore = vaultRestore;
         this.vaultExport = vaultExport;
+        this.vaultPurge = vaultPurge;
         this.jsonTransformer = jsonTransformer;
         this.taskManager = taskManager;
         this.queryTranslator = queryTranslator;
@@ -139,6 +142,7 @@ public class DeletedMessagesVaultRoutes implements Routes {
     @Override
     public void define(Service service) {
         service.post(RESTORE_PATH, this::userActions, jsonTransformer);
+        service.post(ROOT_PATH, this::purgeActions, jsonTransformer);
     }
 
     @POST
@@ -179,6 +183,32 @@ public class DeletedMessagesVaultRoutes implements Routes {
 
         Task requestedTask = generateTask(requestedAction, request);
         TaskId taskId = taskManager.submit(requestedTask);
+        return TaskIdDto.respond(response, taskId);
+    }
+
+    @POST
+    @Path(ROOT_PATH)
+    @ApiOperation(value = "Purge all expired messages base on retentionPeriod of deletedMessageVault configuration")
+    @ApiImplicitParams({
+        @ApiImplicitParam(
+            required = true,
+            name = "action",
+            dataType = "String",
+            paramType = "query",
+            example = "?action=purge",
+            value = "Compulsory. Needs to be a purge action")
+    })
+    @ApiResponses(value = {
+        @ApiResponse(code = HttpStatus.CREATED_201, message = "Task is created", response = TaskIdDto.class),
+        @ApiResponse(code = HttpStatus.BAD_REQUEST_400, message = "Bad request - action is invalid"),
+        @ApiResponse(code = HttpStatus.INTERNAL_SERVER_ERROR_500, message = "Internal server error - Something went bad on the server side.")
+    })
+    private TaskIdDto purgeActions(Request request, Response response) {
+        VaultAction requestedAction = extractVaultAction(request);
+        Preconditions.checkArgument(requestedAction.equals(VaultAction.PURGE));
+
+        Task purgeTask = vaultPurge.purge();
+        TaskId taskId = taskManager.submit(purgeTask);
         return TaskIdDto.respond(response, taskId);
     }
 
