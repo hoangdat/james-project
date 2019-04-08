@@ -27,6 +27,7 @@ import java.util.stream.Stream;
 
 import javax.inject.Inject;
 import javax.mail.internet.AddressException;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -35,6 +36,7 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.james.core.MailAddress;
 import org.apache.james.core.User;
+import org.apache.james.mailbox.model.MessageId;
 import org.apache.james.task.Task;
 import org.apache.james.task.TaskId;
 import org.apache.james.task.TaskManager;
@@ -109,7 +111,10 @@ public class DeletedMessagesVaultRoutes implements Routes {
     public static final String USERS = "users";
     public static final String USER_PATH = ROOT_PATH + SEPARATOR + USERS;
     private static final String USER_PATH_PARAM = "user";
+    static final String MESSAGE_PATH_PARAM = "messages";
+    private static final String MESSAGE_ID_PARAM = ":messageId";
     private static final String RESTORE_PATH = USER_PATH + SEPARATOR + ":" + USER_PATH_PARAM;
+    private static final String DELETE_PATH = USER_PATH + SEPARATOR + ":" + USER_PATH_PARAM + SEPARATOR + MESSAGE_PATH_PARAM + SEPARATOR + MESSAGE_ID_PARAM;
     private static final String ACTION_QUERY_PARAM = "action";
     private static final String EXPORT_TO_QUERY_PARAM = "exportTo";
 
@@ -121,11 +126,13 @@ public class DeletedMessagesVaultRoutes implements Routes {
     private final JsonExtractor<QueryElement> jsonExtractor;
     private final QueryTranslator queryTranslator;
     private final UsersRepository usersRepository;
+    private final MessageId.Factory messageIdFactory;
 
     @Inject
     @VisibleForTesting
-    DeletedMessagesVaultRoutes(DeletedMessageVault deletedMessageVault, RestoreService vaultRestore, ExportService vaultExport, JsonTransformer jsonTransformer,
-                               TaskManager taskManager, QueryTranslator queryTranslator, UsersRepository usersRepository) {
+    DeletedMessagesVaultRoutes(DeletedMessageVault deletedMessageVault, RestoreService vaultRestore, ExportService vaultExport,
+                               JsonTransformer jsonTransformer, TaskManager taskManager, QueryTranslator queryTranslator,
+                               UsersRepository usersRepository, MessageId.Factory messageIdFactory) {
         this.deletedMessageVault = deletedMessageVault;
         this.vaultRestore = vaultRestore;
         this.vaultExport = vaultExport;
@@ -134,6 +141,7 @@ public class DeletedMessagesVaultRoutes implements Routes {
         this.queryTranslator = queryTranslator;
         this.usersRepository = usersRepository;
         this.jsonExtractor = new JsonExtractor<>(QueryElement.class);
+        this.messageIdFactory = messageIdFactory;
     }
 
     @Override
@@ -145,6 +153,7 @@ public class DeletedMessagesVaultRoutes implements Routes {
     public void define(Service service) {
         service.post(RESTORE_PATH, this::userActions, jsonTransformer);
         service.post(ROOT_PATH, this::purgeActions, jsonTransformer);
+        service.delete(DELETE_PATH, this::deleteMessage, jsonTransformer);
     }
 
     @POST
@@ -210,6 +219,40 @@ public class DeletedMessagesVaultRoutes implements Routes {
 
         Task purgeTask = deletedMessageVault.deleteExpiredMessagesTask();
         TaskId taskId = taskManager.submit(purgeTask);
+        return TaskIdDto.respond(response, taskId);
+    }
+
+    @DELETE
+    @Path(DELETE_PATH)
+    @ApiOperation(value = "Delete message with messageId")
+    @ApiImplicitParams({
+        @ApiImplicitParam(
+            required = true,
+            name = "user",
+            paramType = "path parameter",
+            dataType = "String",
+            defaultValue = "none",
+            example = "user0@james.org",
+            value = "Compulsory. Needs to be a valid username represent for an user had requested to restore deleted emails"),
+        @ApiImplicitParam(
+            required = true,
+            name = "messageId",
+            paramType = "path parameter",
+            dataType = "String",
+            defaultValue = "none",
+            value = "Compulsory, Need to be a valid messageId")
+    })
+    @ApiResponses(value = {
+        @ApiResponse(code = HttpStatus.CREATED_201, message = "Task is created", response = TaskIdDto.class),
+        @ApiResponse(code = HttpStatus.BAD_REQUEST_400, message = "Bad request - user param is invalid"),
+        @ApiResponse(code = HttpStatus.INTERNAL_SERVER_ERROR_500, message = "Internal server error - Something went bad on the server side.")
+    })
+    private TaskIdDto deleteMessage(Request request, Response response) {
+        User user = extractUser(request);
+        validateUserExist(user);
+        MessageId messageId = parseMessageId(request);
+
+        TaskId taskId = taskManager.submit(new DeletedMessagesVaultDeleteTask(deletedMessageVault, user, messageId));
         return TaskIdDto.respond(response, taskId);
     }
 
@@ -318,6 +361,20 @@ public class DeletedMessagesVaultRoutes implements Routes {
                 .statusCode(HttpStatus.BAD_REQUEST_400)
                 .type(ErrorResponder.ErrorType.INVALID_ARGUMENT)
                 .message("Not 'purge' action")
+                .haltError();
+        }
+    }
+
+    private MessageId parseMessageId(Request request) {
+        String messageIdAsString = request.params(MESSAGE_ID_PARAM);
+        try {
+            return messageIdFactory.fromString(messageIdAsString);
+        } catch (Exception e) {
+            throw ErrorResponder.builder()
+                .statusCode(HttpStatus.BAD_REQUEST_400)
+                .message("Can not deserialize the supplied messageId: " + messageIdAsString)
+                .cause(e)
+                .type(ErrorResponder.ErrorType.INVALID_ARGUMENT)
                 .haltError();
         }
     }
