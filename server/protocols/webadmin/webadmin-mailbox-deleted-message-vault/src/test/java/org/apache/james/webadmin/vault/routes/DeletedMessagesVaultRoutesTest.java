@@ -31,12 +31,14 @@ import static org.apache.james.vault.DeletedMessageFixture.FINAL_STAGE;
 import static org.apache.james.vault.DeletedMessageFixture.MAILBOX_ID_1;
 import static org.apache.james.vault.DeletedMessageFixture.MAILBOX_ID_2;
 import static org.apache.james.vault.DeletedMessageFixture.MAILBOX_ID_3;
+import static org.apache.james.vault.DeletedMessageFixture.MESSAGE_ID;
 import static org.apache.james.vault.DeletedMessageFixture.SUBJECT;
 import static org.apache.james.vault.DeletedMessageFixture.USER;
 import static org.apache.james.vault.DeletedMessageFixture.USER_2;
 import static org.apache.james.vault.DeletedMessageVaultSearchContract.MESSAGE_ID_GENERATOR;
 import static org.apache.james.webadmin.Constants.SEPARATOR;
 import static org.apache.james.webadmin.WebAdminServer.NO_CONFIGURATION;
+import static org.apache.james.webadmin.vault.routes.DeletedMessagesVaultRoutes.MESSAGE_PATH_PARAM;
 import static org.apache.james.webadmin.vault.routes.DeletedMessagesVaultRoutes.USERS;
 import static org.apache.james.webadmin.vault.routes.DeletedMessagesVaultRoutes.USER_PATH;
 import static org.apache.james.webadmin.vault.routes.RestoreService.RESTORE_MAILBOX_NAME;
@@ -91,6 +93,7 @@ import org.apache.james.mailbox.inmemory.manager.InMemoryIntegrationResources;
 import org.apache.james.mailbox.model.FetchGroupImpl;
 import org.apache.james.mailbox.model.MailboxId;
 import org.apache.james.mailbox.model.MailboxPath;
+import org.apache.james.mailbox.model.MessageId;
 import org.apache.james.mailbox.model.MessageRange;
 import org.apache.james.mailbox.model.MessageResult;
 import org.apache.james.mailbox.model.MultimailboxesSearchQuery;
@@ -146,6 +149,8 @@ class DeletedMessagesVaultRoutesTest {
         "}";
     private static final Domain DOMAIN = Domain.of("apache.org");
     private static final String BOB_PATH = USERS + SEPARATOR + USER.asString();
+    private static final String DELETED_MESSAGE_PARAM_PATH = MESSAGE_PATH_PARAM + SEPARATOR + MESSAGE_ID.serialize();
+    private static final String BOB_DELETE_PATH = BOB_PATH + SEPARATOR + DELETED_MESSAGE_PARAM_PATH;
 
     private WebAdminServer webAdminServer;
     private MemoryDeletedMessagesVault vault;
@@ -177,10 +182,11 @@ class DeletedMessagesVaultRoutesTest {
         exportService = new ExportService(blobExporting, blobStore, zipper, vault);
         QueryTranslator queryTranslator = new QueryTranslator(new InMemoryId.Factory());
         usersRepository = createUsersRepository();
+        MessageId.Factory messageIdFactory = new InMemoryMessageId.Factory();
         webAdminServer = WebAdminUtils.createWebAdminServer(
             new DefaultMetricFactory(),
             new TasksRoutes(taskManager, jsonTransformer),
-            new DeletedMessagesVaultRoutes(vault, vaultRestore, exportService, jsonTransformer, taskManager, queryTranslator, usersRepository));
+            new DeletedMessagesVaultRoutes(vault, vaultRestore, exportService, jsonTransformer, taskManager, queryTranslator, usersRepository, messageIdFactory));
 
         webAdminServer.configure(NO_CONFIGURATION);
         webAdminServer.await();
@@ -2115,6 +2121,138 @@ class DeletedMessagesVaultRoutesTest {
                     .body("startedDate", is(notNullValue()))
                     .body("submitDate", is(notNullValue()))
                     .body("completedDate", is(nullValue()));
+            }
+        }
+    }
+
+    @Nested
+    class DeleteTest {
+
+        @Test
+        void deleteShouldProduceASuccessfulTaskEvenNoDeletedMessageExisted() {
+            String taskId =
+                when()
+                    .delete(BOB_DELETE_PATH)
+                    .jsonPath()
+                    .get("taskId");
+
+            given()
+                .basePath(TasksRoutes.BASE)
+            .when()
+                .get(taskId + "/await")
+            .then()
+                .body("status", is("completed"))
+                .body("taskId", is(taskId))
+                .body("type", is(DeletedMessagesVaultDeleteTask.TYPE))
+                .body("startedDate", is(notNullValue()))
+                .body("submitDate", is(notNullValue()))
+                .body("completedDate", is(notNullValue()));
+        }
+
+        @Test
+        void deleteShouldProduceASuccessfulTask() {
+            vault.append(USER, DELETED_MESSAGE, new ByteArrayInputStream(CONTENT)).block();
+            vault.append(USER, DELETED_MESSAGE_2, new ByteArrayInputStream(CONTENT)).block();
+
+            String taskId =
+                when()
+                    .delete(BOB_DELETE_PATH)
+                    .jsonPath()
+                    .get("taskId");
+
+            given()
+                .basePath(TasksRoutes.BASE)
+            .when()
+                .get(taskId + "/await")
+            .then()
+                .body("status", is("completed"))
+                .body("taskId", is(taskId))
+                .body("type", is(DeletedMessagesVaultDeleteTask.TYPE))
+                .body("startedDate", is(notNullValue()))
+                .body("submitDate", is(notNullValue()))
+                .body("completedDate", is(notNullValue()));
+        }
+
+        @Test
+        void deleteShouldNotAppendMessagesToUserMailbox() throws Exception {
+            vault.append(USER, DELETED_MESSAGE, new ByteArrayInputStream(CONTENT)).block();
+            vault.append(USER, DELETED_MESSAGE_2, new ByteArrayInputStream(CONTENT)).block();
+
+            String taskId =
+                when()
+                    .delete(BOB_DELETE_PATH)
+                    .jsonPath()
+                    .get("taskId");
+
+            given()
+                .basePath(TasksRoutes.BASE)
+            .when()
+                .get(taskId + "/await");
+
+            assertThat(hasAnyMail(USER))
+                .isFalse();
+        }
+
+        @Nested
+        class FailingDeleteTest {
+
+            @Test
+            void deleteShouldProduceAFailedTask() {
+                doReturn(Mono.error(new RuntimeException("mock exception")))
+                    .when(vault)
+                    .delete(any(), any());
+
+                String taskId =
+                    when()
+                        .delete(BOB_DELETE_PATH)
+                        .jsonPath()
+                        .get("taskId");
+
+                given()
+                    .basePath(TasksRoutes.BASE)
+                .when()
+                    .get(taskId + "/await")
+                .then()
+                    .body("status", is("failed"))
+                    .body("taskId", is(taskId))
+                    .body("type", is(DeletedMessagesVaultDeleteTask.TYPE))
+                    .body("startedDate", is(notNullValue()))
+                    .body("submitDate", is(notNullValue()))
+                    .body("completedDate", is(nullValue()));
+            }
+
+            @Test
+            void deleteShouldReturnInvalidWhenUserIsInvalid() {
+                when()
+                    .delete(USERS + SEPARATOR + "not@valid@user.com" + SEPARATOR + DELETED_MESSAGE_PARAM_PATH)
+                .then()
+                    .statusCode(HttpStatus.BAD_REQUEST_400)
+                    .body("statusCode", is(400))
+                    .body("type", is(ErrorResponder.ErrorType.INVALID_ARGUMENT.getType()))
+                    .body("message", is(notNullValue()))
+                    .body("details", is(notNullValue()));
+            }
+
+            @Test
+            void deleteShouldReturnNotFoundWhenUserIsNotFoundInSystem() {
+                when()
+                    .delete(USERS + SEPARATOR + USER_2.asString() + SEPARATOR + DELETED_MESSAGE_PARAM_PATH)
+                .then()
+                    .statusCode(HttpStatus.NOT_FOUND_404)
+                    .body("statusCode", is(404))
+                    .body("type", is(ErrorResponder.ErrorType.NOT_FOUND.getType()))
+                    .body("message", is(notNullValue()));
+            }
+
+            @Test
+            void deleteShouldReturnInvalidWhenMessageIdIsInvalid() {
+                when()
+                    .delete(BOB_PATH + SEPARATOR + MESSAGE_PATH_PARAM + SEPARATOR + "invalid")
+                .then()
+                    .statusCode(HttpStatus.BAD_REQUEST_400)
+                    .body("statusCode", is(400))
+                    .body("type", is(ErrorResponder.ErrorType.INVALID_ARGUMENT.getType()))
+                    .body("message", is(notNullValue()));
             }
         }
     }
