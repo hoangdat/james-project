@@ -2644,6 +2644,7 @@ Here are the following actions available on the 'Deleted Messages Vault'
  - [Restore Deleted Messages](#Restore_deleted_messages)
  - [Export Deleted Messages](#Export_deleted_messages)
  - [Purge Deleted Messages](#Purge_deleted_messages)
+ - [Delete Deleted Message](#Delete_deleted_message) 
 
  Note that the 'Deleted Messages Vault' feature is only supported on top of Cassandra-Guice.
 
@@ -2840,6 +2841,35 @@ You need to create a CRON job to call this endpoint in a regular basis. Example:
 ```
 0 0 * * * /usr/bin/curl --request POST http://ip:port/deletedMessages?action=purge >/dev/null 2>&1
 ```
+
+### Delete Deleted Message
+
+Delete a Deleted Message with MessageId
+
+```
+curl -XDEL http://ip:port/deletedMessages/users/userDeleteTo@domain.ext/messages/3294a976-ce63-491e-bd52-1b6f465ed7a2
+```
+
+Response code:
+
+ - 201: Task for deleting message has been created
+ - 400: Bad request: 
+   - user parameter is invalid
+   - messageId parameter is invalid
+ - 404: User not found
+ 
+ The scheduled task will have the following type `deletedMessages/delete` and the following `additionalInformation`:
+ 
+ ```
+ {
+   "userDeleteTo": "userDeleteTo@domain.ext",
+   "deleteMessageId": "3294a976-ce63-491e-bd52-1b6f465ed7a2"
+ }
+ ```
+ 
+while:
+ - userDeleteTo: delete deleted messages from this user
+ - deleteMessageId: messageId of deleted messages will be delete
 
 ## Task management
 
