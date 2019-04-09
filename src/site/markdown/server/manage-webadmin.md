@@ -2847,7 +2847,7 @@ You need to create a CRON job to call this endpoint in a regular basis. Example:
 Delete a Deleted Message with MessageId
 
 ```
-curl -XDEL http://ip:port/deletedMessages/users/userDeleteTo@domain.ext/messages/3294a976-ce63-491e-bd52-1b6f465ed7a2
+curl -XDEL http://ip:port/deletedMessages/users/user@domain.ext/messages/3294a976-ce63-491e-bd52-1b6f465ed7a2
 ```
 
 Response code:
@@ -2862,13 +2862,13 @@ Response code:
  
  ```
  {
-   "userDeleteTo": "userDeleteTo@domain.ext",
+   "user": "user@domain.ext",
    "deleteMessageId": "3294a976-ce63-491e-bd52-1b6f465ed7a2"
  }
  ```
  
 while:
- - userDeleteTo: delete deleted messages from this user
+ - user: delete deleted messages from this user
  - deleteMessageId: messageId of deleted messages will be delete
 
 ## Task management

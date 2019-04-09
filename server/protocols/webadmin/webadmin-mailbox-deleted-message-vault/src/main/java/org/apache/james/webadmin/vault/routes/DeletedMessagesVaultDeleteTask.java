@@ -33,16 +33,16 @@ public class DeletedMessagesVaultDeleteTask implements Task {
 
     public class AdditionalInformation implements TaskExecutionDetails.AdditionalInformation {
 
-        private final User userDeleteTo;
+        private final User user;
         private final MessageId deleteMessageId;
 
-        AdditionalInformation(User userDeleteTo, MessageId deleteMessageId) {
-            this.userDeleteTo = userDeleteTo;
+        AdditionalInformation(User user, MessageId deleteMessageId) {
+            this.user = user;
             this.deleteMessageId = deleteMessageId;
         }
 
-        public String getUserDeleteTo() {
-            return userDeleteTo.asString();
+        public String getUser() {
+            return user.asString();
         }
 
         public String getDeleteMessageId() {
