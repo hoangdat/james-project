@@ -112,11 +112,11 @@ public class DeletedMessagesVaultRoutes implements Routes {
     public static final String ROOT_PATH = "deletedMessages";
     public static final String USERS = "users";
     public static final String USER_PATH = ROOT_PATH + SEPARATOR + USERS;
-    private static final String USER_PATH_PARAM = "user";
+    private static final String USER_PATH_PARAM = ":user";
     static final String MESSAGE_PATH_PARAM = "messages";
     private static final String MESSAGE_ID_PARAM = ":messageId";
-    private static final String RESTORE_PATH = USER_PATH + SEPARATOR + ":" + USER_PATH_PARAM;
-    private static final String DELETE_PATH = USER_PATH + SEPARATOR + ":" + USER_PATH_PARAM + SEPARATOR + MESSAGE_PATH_PARAM + SEPARATOR + MESSAGE_ID_PARAM;
+    private static final String RESTORE_PATH = USER_PATH + SEPARATOR + USER_PATH_PARAM;
+    private static final String DELETE_PATH = USER_PATH + SEPARATOR + USER_PATH_PARAM + SEPARATOR + MESSAGE_PATH_PARAM + SEPARATOR + MESSAGE_ID_PARAM;
     private static final String ACTION_QUERY_PARAM = "action";
     private static final String EXPORT_TO_QUERY_PARAM = "exportTo";
 
@@ -246,6 +246,7 @@ public class DeletedMessagesVaultRoutes implements Routes {
     @ApiResponses(value = {
         @ApiResponse(code = HttpStatus.CREATED_201, message = "Task is created", response = TaskIdDto.class),
         @ApiResponse(code = HttpStatus.BAD_REQUEST_400, message = "Bad request - user param is invalid"),
+        @ApiResponse(code = HttpStatus.BAD_REQUEST_400, message = "Bad request - messageId param is invalid"),
         @ApiResponse(code = HttpStatus.INTERNAL_SERVER_ERROR_500, message = "Internal server error - Something went bad on the server side.")
     })
     private TaskIdDto deleteMessage(Request request, Response response) {

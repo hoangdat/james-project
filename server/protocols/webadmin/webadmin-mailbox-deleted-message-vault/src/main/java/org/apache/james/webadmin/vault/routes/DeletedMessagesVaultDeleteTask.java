@@ -31,6 +31,25 @@ import reactor.core.publisher.Mono;
 
 public class DeletedMessagesVaultDeleteTask implements Task {
 
+    public class AdditionalInformation implements TaskExecutionDetails.AdditionalInformation {
+
+        private final User userDeleteTo;
+        private final MessageId deleteMessageId;
+
+        AdditionalInformation(User userDeleteTo, MessageId deleteMessageId) {
+            this.userDeleteTo = userDeleteTo;
+            this.deleteMessageId = deleteMessageId;
+        }
+
+        public String getUserDeleteTo() {
+            return userDeleteTo.asString();
+        }
+
+        public String getDeleteMessageId() {
+            return deleteMessageId.serialize();
+        }
+    }
+
     static final String TYPE = "deletedMessages/delete";
 
     private final DeletedMessageVault vault;
@@ -46,7 +65,7 @@ public class DeletedMessagesVaultDeleteTask implements Task {
     @Override
     public Result run() {
         return Mono.from(vault.delete(user, messageId))
-            .doOnError(e -> LOGGER.error("Error while deleting message in DeletedMessageVault: {}", e.getMessage()))
+            .doOnError(e -> LOGGER.error("Error while deleting message {} for user {} in DeletedMessageVault: {}", messageId, user, e))
             .thenReturn(Result.COMPLETED)
             .blockOptional()
             .orElse(Result.PARTIAL);
@@ -59,7 +78,7 @@ public class DeletedMessagesVaultDeleteTask implements Task {
 
     @Override
     public Optional<TaskExecutionDetails.AdditionalInformation> details() {
-        return Optional.empty();
+        return Optional.of(new AdditionalInformation(user, messageId));
     }
 
 }

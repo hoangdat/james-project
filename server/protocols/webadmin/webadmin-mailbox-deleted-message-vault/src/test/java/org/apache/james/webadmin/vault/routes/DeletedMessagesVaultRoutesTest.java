@@ -105,6 +105,7 @@ import org.apache.james.vault.DeletedMessage;
 import org.apache.james.vault.DeletedMessageZipper;
 import org.apache.james.vault.RetentionConfiguration;
 import org.apache.james.vault.memory.MemoryDeletedMessagesVault;
+import org.apache.james.vault.search.CriterionFactory;
 import org.apache.james.vault.search.Query;
 import org.apache.james.vault.utils.DeleteByQueryExecutor;
 import org.apache.james.vault.utils.VaultGarbageCollectionTask;
@@ -2131,7 +2132,7 @@ class DeletedMessagesVaultRoutesTest {
         @Test
         void deleteShouldProduceASuccessfulTaskEvenNoDeletedMessageExisted() {
             String taskId =
-                when()
+                with()
                     .delete(BOB_DELETE_PATH)
                     .jsonPath()
                     .get("taskId");
@@ -2144,6 +2145,8 @@ class DeletedMessagesVaultRoutesTest {
                 .body("status", is("completed"))
                 .body("taskId", is(taskId))
                 .body("type", is(DeletedMessagesVaultDeleteTask.TYPE))
+                .body("additionalInformation.userDeleteTo", is(USER.asString()))
+                .body("additionalInformation.deleteMessageId", is(MESSAGE_ID.serialize()))
                 .body("startedDate", is(notNullValue()))
                 .body("submitDate", is(notNullValue()))
                 .body("completedDate", is(notNullValue()));
@@ -2155,7 +2158,7 @@ class DeletedMessagesVaultRoutesTest {
             vault.append(USER, DELETED_MESSAGE_2, new ByteArrayInputStream(CONTENT)).block();
 
             String taskId =
-                when()
+                with()
                     .delete(BOB_DELETE_PATH)
                     .jsonPath()
                     .get("taskId");
@@ -2168,6 +2171,8 @@ class DeletedMessagesVaultRoutesTest {
                 .body("status", is("completed"))
                 .body("taskId", is(taskId))
                 .body("type", is(DeletedMessagesVaultDeleteTask.TYPE))
+                .body("additionalInformation.userDeleteTo", is(USER.asString()))
+                .body("additionalInformation.deleteMessageId", is(MESSAGE_ID.serialize()))
                 .body("startedDate", is(notNullValue()))
                 .body("submitDate", is(notNullValue()))
                 .body("completedDate", is(notNullValue()));
@@ -2179,18 +2184,53 @@ class DeletedMessagesVaultRoutesTest {
             vault.append(USER, DELETED_MESSAGE_2, new ByteArrayInputStream(CONTENT)).block();
 
             String taskId =
-                when()
+                with()
                     .delete(BOB_DELETE_PATH)
                     .jsonPath()
                     .get("taskId");
 
-            given()
+            with()
                 .basePath(TasksRoutes.BASE)
-            .when()
                 .get(taskId + "/await");
 
             assertThat(hasAnyMail(USER))
                 .isFalse();
+        }
+
+        @Test
+        void deleteShouldDeleteMessagesFromTheVault() throws Exception {
+            vault.append(USER, DELETED_MESSAGE, new ByteArrayInputStream(CONTENT)).block();
+
+            String taskId =
+                with()
+                    .delete(BOB_DELETE_PATH)
+                    .jsonPath()
+                    .get("taskId");
+
+            with()
+                .basePath(TasksRoutes.BASE)
+                .get(taskId + "/await");
+
+            assertThat(Flux.from(vault.search(USER, Query.ALL)).toStream())
+                .isEmpty();
+        }
+
+        @Test
+        void deleteShouldNotDeleteNotMatchMessagesFromTheVault() throws Exception {
+            vault.append(USER, DELETED_MESSAGE_2, new ByteArrayInputStream(CONTENT)).block();
+
+            String taskId =
+                with()
+                    .delete(BOB_DELETE_PATH)
+                    .jsonPath()
+                    .get("taskId");
+
+            with()
+                .basePath(TasksRoutes.BASE)
+                .get(taskId + "/await");
+
+            assertThat(Flux.from(vault.search(USER, Query.ALL)).toStream())
+                .contains(DELETED_MESSAGE_2);
         }
 
         @Nested
@@ -2203,7 +2243,7 @@ class DeletedMessagesVaultRoutesTest {
                     .delete(any(), any());
 
                 String taskId =
-                    when()
+                    with()
                         .delete(BOB_DELETE_PATH)
                         .jsonPath()
                         .get("taskId");
@@ -2216,6 +2256,8 @@ class DeletedMessagesVaultRoutesTest {
                     .body("status", is("failed"))
                     .body("taskId", is(taskId))
                     .body("type", is(DeletedMessagesVaultDeleteTask.TYPE))
+                    .body("additionalInformation.userDeleteTo", is(USER.asString()))
+                    .body("additionalInformation.deleteMessageId", is(MESSAGE_ID.serialize()))
                     .body("startedDate", is(notNullValue()))
                     .body("submitDate", is(notNullValue()))
                     .body("completedDate", is(nullValue()));
