@@ -2130,6 +2130,15 @@ class DeletedMessagesVaultRoutesTest {
     class DeleteTest {
 
         @Test
+        void deleteShouldReturnATaskCreated() {
+            when()
+                .delete(BOB_DELETE_PATH)
+            .then()
+                .statusCode(HttpStatus.CREATED_201)
+                .body("taskId", notNullValue());
+        }
+
+        @Test
         void deleteShouldProduceASuccessfulTaskEvenNoDeletedMessageExisted() {
             String taskId =
                 with()
